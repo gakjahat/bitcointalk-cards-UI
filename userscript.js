@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bitcointalk Modern UI (Mobile Friendly)
 // @namespace    https://bitcointalk.org/
-// @version      1.4.12
+// @version      1.4.13
 // @description  Modern, mobile-friendly Bitcointalk UI: index, boards, neat thread posts (uncropped avatars) and a light/dark skin for every other page. Language: auto / English / Indonesia.
 // @author       Gak Jahat
 // @match        https://bitcointalk.org/*
@@ -192,9 +192,10 @@
   function parseBoardsIn(box) {
     const out = [];
     let cur = null;
-    box.querySelectorAll('table.bordercolor tr').forEach((tr) => {
-      const info = tr.querySelector(':scope > td.windowbg2');
-      if (info && info.querySelector('b > a[name]')) {
+    box.querySelectorAll('tr').forEach((tr) => {
+      if (tr.querySelector('tr')) return;
+      const info = tr.children[1];
+      if (info && info.tagName === 'TD' && info.querySelector('b > a[name], b > a[href*="board="]')) {
         cur = parseBoard(tr);
         out.push(cur);
       } else {
@@ -207,8 +208,9 @@
 
   function parseCategories() {
     const cats = [];
-    document.querySelectorAll('#bodyarea > div.tborder').forEach((box) => {
-      const head = box.querySelector('.catbg2');
+    document.querySelectorAll('#bodyarea div.tborder').forEach((box) => {
+      if (box.parentElement && box.parentElement.closest('div.tborder')) return;
+      const head = box.querySelector('.catbg2, .catbg');
       if (!head) return;
       const boards = parseBoardsIn(box);
       if (boards.length) cats.push({ title: txt(head), boards });
