@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Bitcointalk Modern UI (Mobile Friendly)
 // @namespace    https://bitcointalk.org/
-// @version      1.4.2
+// @version      1.4.12
 // @description  Modern, mobile-friendly Bitcointalk UI: index, boards, neat thread posts (uncropped avatars) and a light/dark skin for every other page. Language: auto / English / Indonesia.
-// @author       masulum
+// @author       Gak Jahat
 // @match        https://bitcointalk.org/*
 // @run-at       document-end
 // @grant        GM_getValue
@@ -55,6 +55,7 @@
       childBoards: 'Child Boards', sortBy: 'Sort by:', pages: 'Pages', first: 'First', prev: 'Previous', next: 'Next', last: 'Last', go: 'Go',
       noTopic: 'No matching topics.', emptyBoard: 'No topics in this board yet.',
       sigOriginal: 'Keep signatures in original look',
+      pinfoRebuild: 'Rebuild poster info (turn off if another script conflicts)',
       actMap: {}, sortMap: {}
     },
     id: {
@@ -75,6 +76,7 @@
       childBoards: 'Child board', sortBy: 'Urutkan:', pages: 'Halaman', first: 'Pertama', prev: 'Sebelumnya', next: 'Berikutnya', last: 'Terakhir', go: 'Ke',
       noTopic: 'Tidak ada topik yang cocok.', emptyBoard: 'Belum ada topik di board ini.',
       sigOriginal: 'Signature tampil seperti aslinya',
+      pinfoRebuild: 'Tata ulang info poster (matikan jika bentrok dengan script lain)',
       actMap: { 'New Topic': 'Topik baru', 'Post new poll': 'Polling baru', 'Mark Read': 'Tandai dibaca', 'Notify': 'Notifikasi' },
       sortMap: { 'Subject': 'Judul', 'Started by': 'Pembuat', 'Replies': 'Balasan', 'Views': 'Dilihat', 'Last post': 'Terakhir' }
     }
@@ -375,9 +377,11 @@
    * ------------------------------------------------------------------ */
   const CSS = `
 :root{
-  --bg:#f4f3fa; --surface:#ffffff; --surface2:#efeef8; --text:#262a41; --muted:#6c7090;
-  --border:#e4e2f0; --shadow:0 1px 2px rgba(50,50,100,.05),0 6px 20px rgba(50,50,100,.06);
-  --accent:#7b82f0; --on-accent:#ffffff;
+  --bg:#E5E5E8; --surface:#F6F6F6; --surface2:#ECEDF3; --text:#000000; --muted:#666666;
+  --border:#ADADAD; --shadow:0 1px 2px rgba(0,0,0,.06),0 4px 14px rgba(0,0,0,.07);
+  --accent:#476C8E; --on-accent:#ffffff;
+  --head-bg:#E9F0F6; --head-text:#000000; --head-border:#9BAEBF;
+  --quote-bg:#f1f2f4; --quote-border:#d0d0e0;
   --btx-sigbg:transparent; --btx-sigpad:0px;
   --r-lg:20px; --r-md:14px; --r-sm:10px;
   color-scheme:light;
@@ -385,7 +389,9 @@
 :root[data-theme="dark"]{
   --bg:#12131a; --surface:#1b1d28; --surface2:#242736; --text:#e8e9f4; --muted:#979ab6;
   --border:#2c2f42; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.28);
-  --accent:#9aa0ff; --on-accent:#14152a;
+  --accent:#8fb4d9; --on-accent:#14152a;
+  --head-bg:#242736; --head-text:#e8e9f4; --head-border:#2c2f42;
+  --quote-bg:#242736; --quote-border:#2c2f42;
   --btx-sigbg:#eceef5; --btx-sigpad:8px;
   color-scheme:dark;
 }
@@ -395,7 +401,17 @@
 :root[data-theme="dark"][data-accent="mint"]{--accent:#6fd3bf}
 :root[data-theme="dark"][data-accent="peach"]{--accent:#ffa488}
 :root[data-theme="dark"][data-accent="sky"]{--accent:#7bc0f5}
-:root[data-accent="mint"],:root[data-accent="peach"],:root[data-accent="sky"]{--on-accent:#fff}
+:root[data-accent="lavender"]{--accent:#7b82f0}
+:root[data-theme="dark"][data-accent="lavender"]{--accent:#9aa0ff}
+:root[data-theme="light"][data-accent="white"]{
+  --bg:#f4f3fa; --surface:#ffffff; --surface2:#efeef8; --text:#262a41; --muted:#6c7090;
+  --border:#e4e2f0; --shadow:0 1px 2px rgba(50,50,100,.05),0 6px 20px rgba(50,50,100,.06);
+  --accent:#7b82f0; --on-accent:#ffffff;
+  --head-bg:#efeef8; --head-text:#262a41; --head-border:#e4e2f0;
+  --quote-bg:#efeef8; --quote-border:#e4e2f0;
+}
+:root[data-theme="dark"][data-accent="white"]{--accent:#9aa0ff}
+:root[data-accent="lavender"],:root[data-accent="mint"],:root[data-accent="peach"],:root[data-accent="sky"],:root[data-accent="white"]{--on-accent:#fff}
 :root[data-theme="dark"][data-accent]{--on-accent:#14152a}
 
 html{background:var(--bg)}
@@ -426,20 +442,37 @@ body.btx-full > *:not(#btx-app){display:none !important}
 
 .btx-wrap{max-width:1180px;min-width:0;margin:0 auto;padding:16px max(14px,env(safe-area-inset-left)) 40px max(14px,env(safe-area-inset-right))}
 .btx-shellwrap{padding-bottom:0}
+.btx-hero.compact{padding:12px 14px}
+.btx-hero.compact .btx-hello{font-size:16px}
+.btx-hero.compact .btx-quick{margin-top:10px}
+.btx-shellwrap > .btx-tools{grid-template-columns:minmax(0,1fr);max-width:560px}
+.btx-shellrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-top:10px}
+.btx-shellrow .btx-quick{margin-top:0}
+.btx-shellrow .btx-tools{margin-top:0;flex:1 1 320px;max-width:460px;grid-template-columns:minmax(0,1fr) !important}
+
+/* shell (halaman non-index/board): nav di kiri, search di kanan; mobile ditumpuk */
+.btx-shellbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-top:12px}
+.btx-shellbar .btx-nav{margin:0;padding:0;flex:1 1 auto;min-width:0}
+.btx-shellsearch{flex:0 1 340px;min-width:240px;margin-left:auto}
+.btx-shellsearch .btx-field{height:42px}
+@media(max-width:699px){
+  .btx-shellbar{flex-direction:column;align-items:stretch;gap:10px}
+  .btx-shellsearch{flex:none;width:100%;min-width:0;margin-left:0}
+}
 
 /* hero */
 .btx-hero{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:16px}
-.btx-hero-top{display:flex;align-items:center;gap:14px}
-.btx-hero-txt{min-width:0;flex:1}
+.btx-hero-top{display:flex;flex-wrap:wrap;align-items:center;gap:14px}
+.btx-hero-txt{min-width:0;flex:1 1 160px}
 .btx-hello,.btx-sub{overflow-wrap:anywhere}
-.btx-avatar{order:2;margin-left:auto;flex:none;display:block;width:auto;height:auto;max-width:112px;max-height:112px;
+.btx-avatar{order:2;margin-left:auto;flex:none;display:block;width:auto;height:auto;max-width:100%;
   object-fit:contain;border-radius:14px;background:var(--surface2);border:1px solid var(--border);
   box-shadow:0 4px 14px rgba(0,0,0,.10)}
 div.btx-avatar{display:grid;place-items:center;width:64px;height:64px;font-weight:700;font-size:24px;color:var(--accent);
   border:2px solid color-mix(in srgb,var(--accent) 35%,transparent)}
 @media(max-width:599px){
   .btx-hero-top{align-items:flex-start;gap:12px}
-  .btx-avatar{max-width:76px;max-height:96px;border-radius:12px}
+  .btx-avatar{border-radius:12px}
   div.btx-avatar{width:56px;height:56px;font-size:22px}
 }
 .btx-hello{font-size:18px;font-weight:700;letter-spacing:-.01em;margin:0}
@@ -456,8 +489,7 @@ div.btx-avatar{display:grid;place-items:center;width:64px;height:64px;font-weigh
 .btx-news b{color:var(--text)}
 
 /* nav */
-.btx-nav{display:flex;gap:8px;overflow-x:auto;margin:14px -14px 0;padding:2px 14px 6px;scrollbar-width:none}
-.btx-nav::-webkit-scrollbar{display:none}
+.btx-nav{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;padding:2px 0 6px}
 .btx-nav a{flex:none;padding:8px 15px;border-radius:12px;font-size:14px;font-weight:500;color:var(--muted) !important;
   background:var(--surface);border:1px solid var(--border)}
 .btx-nav a.on{background:var(--accent);color:var(--on-accent) !important;border-color:transparent;font-weight:600}
@@ -529,9 +561,9 @@ body.btx-nodesc .btx-b-desc{display:none}
 .btx-markall{border:0;background:transparent;color:var(--muted) !important;font-size:13px;text-decoration:underline !important;padding:6px}
 
 /* halaman board */
-.btx-crumbs{display:flex;align-items:center;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0 6px;margin-top:8px;font-size:13px}
+.btx-crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;padding:2px 0 6px;margin-top:8px;font-size:13px}
 .btx-crumbs::-webkit-scrollbar{display:none}
-.btx-crumbs a,.btx-crumbs span{flex:none;color:var(--muted) !important;white-space:nowrap}
+.btx-crumbs a,.btx-crumbs span{min-width:0;color:var(--muted) !important;overflow-wrap:anywhere}
 .btx-crumbs a:hover{color:var(--accent) !important}
 .btx-crumbs .sep{opacity:.5}
 .btx-bhead{margin-top:6px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:16px}
@@ -541,12 +573,12 @@ body.btx-nodesc .btx-b-desc{display:none}
 .btx-btn{display:inline-flex;align-items:center;padding:9px 16px;border-radius:12px;font-weight:600;font-size:14px;
   background:var(--surface2);color:var(--text) !important;border:0}
 .btx-btn.primary{background:var(--accent);color:var(--on-accent) !important}
-.btx-sorts{display:flex;align-items:center;gap:6px;overflow-x:auto;scrollbar-width:none;margin:12px 0 10px}
+.btx-sorts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0 10px}
 .btx-sorts::-webkit-scrollbar{display:none}
 .btx-sorts .lbl{flex:none;font-size:13px;color:var(--muted);margin-right:2px}
 .btx-sort{flex:none;padding:6px 12px;border-radius:999px;font-size:13px;border:1px solid var(--border);color:var(--muted) !important;background:var(--surface)}
 .btx-sort.on{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent) !important;border-color:transparent;font-weight:600}
-.btx-pager{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:6px 0;margin:6px 0}
+.btx-pager{display:flex;flex-wrap:wrap;gap:6px;padding:6px 0;margin:6px 0}
 .btx-pager::-webkit-scrollbar{display:none}
 .btx-pager .pg{flex:none;min-width:36px;height:36px;display:grid;place-items:center;padding:0 10px;border-radius:10px;
   background:var(--surface);border:1px solid var(--border);font-size:14px;font-weight:600;color:var(--text) !important}
@@ -619,7 +651,7 @@ body.btx-legacy #bodyarea td.btx-pgcell{padding:6px 0}
 /* ===== Skin untuk halaman lain (topik, help, profil, dll) ===== */
 body.btx-legacy{margin:0;background:var(--bg);color:var(--text);
   font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;-webkit-text-size-adjust:100%}
-body.btx-legacy #bodyarea{max-width:1180px;margin:0 auto !important;padding:16px max(14px,env(safe-area-inset-left)) 28px !important;overflow-x:auto;color:var(--text)}
+body.btx-legacy #bodyarea{box-sizing:border-box;width:100%;max-width:1180px;margin:0 auto !important;padding:16px max(14px,env(safe-area-inset-left)) 28px !important;overflow-x:auto;color:var(--text)}
 body.btx-legacy #bodyarea td,body.btx-legacy #bodyarea th,body.btx-legacy #bodyarea div,body.btx-legacy #bodyarea span,
 body.btx-legacy #bodyarea p,body.btx-legacy #bodyarea li,body.btx-legacy #bodyarea label{color:var(--text)}
 body.btx-legacy #bodyarea a{color:var(--accent)}
@@ -628,11 +660,12 @@ body.btx-legacy #bodyarea .tborder{background:var(--surface);border:1px solid va
 body.btx-legacy #bodyarea .bordercolor{background:var(--border)}
 body.btx-legacy #bodyarea .windowbg,body.btx-legacy #bodyarea .windowbg2{background:var(--surface);background-image:none}
 body.btx-legacy #bodyarea .windowbg3{background:var(--surface2);background-image:none}
+body.btx-legacy #bodyarea #preview_body{background:var(--surface);background-image:none;color:var(--text)}
 body.btx-legacy #bodyarea .catbg,body.btx-legacy #bodyarea .catbg2,body.btx-legacy #bodyarea .catbg3,
 body.btx-legacy #bodyarea .titlebg,body.btx-legacy #bodyarea .titlebg2,body.btx-legacy #bodyarea .titlebg td,body.btx-legacy #bodyarea .titlebg2 td{
-  background:var(--surface2);background-image:none;color:var(--text);font-weight:600}
+  background:var(--head-bg);background-image:none;color:var(--head-text);font-weight:600;border-bottom:1px solid var(--head-border)}
 body.btx-legacy #bodyarea .catbg a,body.btx-legacy #bodyarea .catbg2 a,body.btx-legacy #bodyarea .catbg3 a,
-body.btx-legacy #bodyarea .titlebg a,body.btx-legacy #bodyarea .titlebg2 a{color:var(--text)}
+body.btx-legacy #bodyarea .titlebg a,body.btx-legacy #bodyarea .titlebg2 a{color:var(--head-text)}
 body.btx-legacy #bodyarea .navPages{padding:2px 8px;border-radius:8px;background:var(--surface2);text-decoration:none}
 body.btx-legacy #bodyarea td[class^="maintab_"],body.btx-legacy #bodyarea td[class^="mirrortab_"]{background:none;background-image:none}
 body.btx-legacy #bodyarea td.maintab_first,body.btx-legacy #bodyarea td.maintab_last,
@@ -649,7 +682,7 @@ body.btx-legacy #bodyarea .post,body.btx-legacy #bodyarea .signature{overflow-wr
 body.btx-legacy #bodyarea .signature{color:var(--muted)}
 body.btx-legacy #bodyarea .post img{max-width:100%;height:auto}
 body.btx-legacy #bodyarea .quote,body.btx-legacy #bodyarea .quoteheader,body.btx-legacy #bodyarea .code,body.btx-legacy #bodyarea .codeheader{
-  background:var(--surface2) !important;border:1px solid var(--border) !important;color:var(--text) !important;border-radius:10px}
+  background:var(--quote-bg) !important;border:1px solid var(--quote-border) !important;color:var(--text) !important;border-radius:10px}
 body.btx-legacy #bodyarea pre,body.btx-legacy #bodyarea code{max-width:100%;overflow:auto}
 body.btx-legacy #bodyarea hr{border:0;border-top:1px solid var(--border);background:none;height:0}
 body.btx-legacy #bodyarea table{max-width:100%}
@@ -700,9 +733,13 @@ body.btx-legacy #bodyarea .btx-op{display:inline-block;margin-left:6px;padding:1
 body.btx-legacy #bodyarea .btx-pi-rank{font-size:12.5px;color:var(--muted)}
 body.btx-legacy #bodyarea .btx-pi-stars{line-height:1}
 body.btx-legacy #bodyarea .btx-pi-stars img{vertical-align:middle}
-body.btx-legacy #bodyarea .btx-pi-stats{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:4px}
-body.btx-legacy #bodyarea .btx-pi-stat{display:inline-flex;align-items:baseline;gap:5px;padding:3px 9px;border-radius:999px;
-  background:var(--surface2);font-size:12px;line-height:1.4;white-space:nowrap}
+body.btx-legacy #bodyarea .btx-pi-stats{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;margin-top:4px;max-width:100%}
+body.btx-legacy #bodyarea .btx-pi-stat{display:inline-flex;align-items:baseline;gap:4px;padding:2px 8px;border-radius:999px;
+  background:var(--surface2);font-size:11px;line-height:1.45;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+body.btx-legacy #bodyarea .btx-pi > *{min-width:0;max-width:100%}
+body.btx-legacy #bodyarea .btx-pi-extra *,body.btx-legacy #bodyarea .btx-pi-acts *{max-width:100%;overflow-wrap:anywhere}
+body.btx-legacy #bodyarea .btx-pi-extra img,body.btx-legacy #bodyarea .btx-pi-acts img{height:auto}
+body.btx-legacy #bodyarea .btx-pi-extra table{width:auto !important;table-layout:auto}
 body.btx-legacy #bodyarea .btx-pi-stat em{font-style:normal;color:var(--muted)}
 body.btx-legacy #bodyarea .btx-pi-stat b{font-weight:700;color:var(--text)}
 body.btx-legacy #bodyarea .btx-pi-extra{order:2;width:100%;display:flex;flex-direction:column;gap:4px;padding:8px 10px;border-radius:12px;
@@ -713,6 +750,11 @@ body.btx-legacy #bodyarea .btx-pi-extra a{font-weight:700}
 body.btx-legacy #bodyarea .btx-pi-acts{order:3;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:10px;font-size:12.5px}
 body.btx-legacy #bodyarea .btx-pi-acts img{vertical-align:middle}
 
+body.btx-legacy #bodyarea td.btx-rebuilt{font-size:0 !important;line-height:0 !important}
+body.btx-legacy #bodyarea td.btx-rebuilt > :not(.btx-pi){display:none !important}
+body.btx-legacy #bodyarea td.btx-rebuilt > .btx-pi{font-size:14px;line-height:1.55}
+body.btx-legacy #bodyarea .btx-pcell:not(.btx-rebuilt) img.avatar{max-width:100% !important;width:auto !important;height:auto !important;border-radius:12px}
+
 @media(max-width:759px){
   body.btx-legacy #bodyarea .btx-ptable,
   body.btx-legacy #bodyarea .btx-ptable > tbody,
@@ -720,17 +762,108 @@ body.btx-legacy #bodyarea .btx-pi-acts img{vertical-align:middle}
   body.btx-legacy #bodyarea .btx-ptable > tbody > tr > td{display:block;width:100% !important;max-width:100% !important;box-sizing:border-box}
   body.btx-legacy #bodyarea .btx-ptable > tbody > tr > td{padding-left:2px;padding-right:2px}
   body.btx-legacy #bodyarea .btx-pcell{padding:12px 4px 8px !important}
+  /* mobile: avatar + nama/rank di atas; statistik, info tambahan (script lain), dan aksi turun ke baris penuh di bawahnya */
   body.btx-legacy #bodyarea .btx-pi{display:grid;grid-template-columns:auto minmax(0,1fr);
-    grid-template-areas:"av id" "ex ex" "ac ac";text-align:left;align-items:start;column-gap:12px;row-gap:10px;
+    grid-template-areas:"av name" "av rank" "av stars" "av fill" "st st" "ex ex" "ac ac";
+    grid-template-rows:auto auto auto minmax(0,1fr) auto auto auto;
+    text-align:left;align-items:start;column-gap:12px;row-gap:0;
     padding:10px;border-radius:14px;background:var(--surface2);border-left:4px solid var(--accent)}
-  body.btx-legacy #bodyarea .btx-pi.noav{grid-template-columns:minmax(0,1fr);grid-template-areas:"id" "ex" "ac"}
+  body.btx-legacy #bodyarea .btx-pi.noav{grid-template-columns:minmax(0,1fr);grid-template-areas:"name" "rank" "stars" "st" "ex" "ac";grid-template-rows:none}
   body.btx-legacy #bodyarea .btx-pi-av{grid-area:av;width:92px;max-width:92px;align-items:flex-start}
   body.btx-legacy #bodyarea .btx-pi-av img{max-width:92px !important;max-height:140px}
-  body.btx-legacy #bodyarea .btx-pi-id{grid-area:id;align-items:flex-start}
-  body.btx-legacy #bodyarea .btx-pi-stats{justify-content:flex-start}
-  body.btx-legacy #bodyarea .btx-pi-extra{grid-area:ex}
-  body.btx-legacy #bodyarea .btx-pi-acts{grid-area:ac;justify-content:flex-start}
+  body.btx-legacy #bodyarea .btx-pi-id{display:contents}
+  body.btx-legacy #bodyarea .btx-pi-name{grid-area:name;min-width:0}
+  body.btx-legacy #bodyarea .btx-pi-rank{grid-area:rank}
+  body.btx-legacy #bodyarea .btx-pi-stars{grid-area:stars;margin-top:2px}
+  body.btx-legacy #bodyarea .btx-pi-stats{grid-area:st;justify-content:flex-start;margin-top:10px;gap:4px;width:100%}
+  body.btx-legacy #bodyarea .btx-pi-stat{font-size:11px;padding:2px 8px}
+  body.btx-legacy #bodyarea .btx-pi-stats.many .btx-pi-stat{font-size:10px;padding:1px 6px}
+  body.btx-legacy #bodyarea .btx-pi-extra{grid-area:ex;margin-top:8px;font-size:12px}
+  body.btx-legacy #bodyarea .btx-pi-extra.many{font-size:11px;padding:6px 8px}
+  body.btx-legacy #bodyarea .btx-pi-acts{grid-area:ac;justify-content:flex-start;margin-top:8px}
   body.btx-legacy #bodyarea .btx-pi-extra{background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
+}
+
+/* ===== Thread: bar pager + aksi, kartu post, tampilan mobile ===== */
+body.btx-legacy #bodyarea .mirrortab_back,body.btx-legacy #bodyarea .maintab_back{font-size:0 !important;line-height:0}
+body.btx-legacy #bodyarea .mirrortab_back a,body.btx-legacy #bodyarea .maintab_back a{font-size:13px;line-height:1.4;margin:3px 6px 3px 0}
+body.btx-legacy #bodyarea .btx-pgbar,body.btx-legacy #bodyarea .btx-pgbar > tbody{display:block;width:100% !important}
+body.btx-legacy #bodyarea .btx-pgbar > tbody > tr{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 16px}
+body.btx-legacy #bodyarea .btx-pgbar > tbody > tr > td{display:block;width:auto !important;min-width:0;padding:0 !important}
+body.btx-legacy #bodyarea .btx-pgbar > tbody > tr > td.btx-pgcell{flex:1 1 360px}
+body.btx-legacy #bodyarea .btx-pgbar > tbody > tr > td:not(.btx-pgcell){flex:0 1 auto;text-align:right}
+body.btx-legacy #bodyarea .btx-pgbar .btx-pager2{justify-content:flex-start;margin:0}
+body.btx-legacy #bodyarea .btx-pgbar div.nav{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px 12px;margin:0 0 4px !important;font-size:12.5px}
+body.btx-legacy #bodyarea .btx-pgbar td table{margin-left:auto}
+
+/* bar paginasi + tombol aksi di halaman thread: kecil, sejajar, mudah dibaca */
+body.btx-legacy #bodyarea .btx-pgbar .btx-pager{gap:4px;padding:0;margin:0;align-items:center}
+body.btx-legacy #bodyarea .btx-pgbar .btx-pager .pg{min-width:28px;height:28px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:700;line-height:1;
+  background:var(--surface);color:var(--text) !important;border:1px solid color-mix(in srgb,var(--accent) 28%,var(--border));
+  display:inline-flex;align-items:center;justify-content:center;text-decoration:none;transition:background .15s,color .15s}
+body.btx-legacy #bodyarea .btx-pgbar .btx-pager a.pg:hover{background:color-mix(in srgb,var(--accent) 16%,var(--surface));color:var(--accent) !important}
+body.btx-legacy #bodyarea .btx-pgbar .btx-pager .pg.on{background:var(--accent);color:var(--on-accent) !important;border-color:transparent;
+  box-shadow:0 2px 8px color-mix(in srgb,var(--accent) 45%,transparent)}
+body.btx-legacy #bodyarea .btx-pgbar .btx-pager .pg.nav{padding:0 10px;gap:3px;font-size:12px}
+body.btx-legacy #bodyarea .btx-pgbar .btx-pager .pg.nav .t{font-size:11px}
+body.btx-legacy #bodyarea .btx-pgbar .btx-pager .gap{font-size:12px}
+body.btx-legacy #bodyarea .btx-pgbar .btx-jump{gap:4px;margin-left:2px}
+body.btx-legacy #bodyarea .btx-pgbar .btx-jump input{width:64px;height:28px;padding:0 10px;border-radius:999px;font-size:12px;box-sizing:border-box}
+body.btx-legacy #bodyarea .btx-pgbar .btx-jump button{height:28px;padding:0 12px;border-radius:999px;font-size:12px}
+body.btx-legacy #bodyarea .btx-pgbar td table{border-collapse:separate;border-spacing:0}
+body.btx-legacy #bodyarea .btx-pgbar td table > tbody{display:block}
+body.btx-legacy #bodyarea .btx-pgbar td table > tbody > tr{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px}
+body.btx-legacy #bodyarea .btx-pgbar td table td.mirrortab_back,body.btx-legacy #bodyarea .btx-pgbar td table td.maintab_back{display:block;width:auto !important;padding:0 !important}
+body.btx-legacy #bodyarea .btx-pgbar .mirrortab_back a,body.btx-legacy #bodyarea .btx-pgbar .maintab_back a{display:inline-flex;align-items:center;height:28px;padding:0 13px;margin:0;
+  border-radius:999px;font-size:12px;font-weight:700;line-height:1;letter-spacing:.01em;text-decoration:none;box-sizing:border-box;
+  color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);
+  transition:background .15s,color .15s}
+body.btx-legacy #bodyarea .btx-pgbar .mirrortab_back a:hover,body.btx-legacy #bodyarea .btx-pgbar .maintab_back a:hover{background:var(--accent);color:var(--on-accent);border-color:transparent}
+body.btx-legacy #bodyarea .btx-pgbar .mirrortab_back a[href*="action=post;"],body.btx-legacy #bodyarea .btx-pgbar .maintab_back a[href*="action=post;"]{
+  background:var(--accent);color:var(--on-accent);border-color:transparent;box-shadow:0 2px 8px color-mix(in srgb,var(--accent) 40%,transparent)}
+@media(max-width:760px){
+  body.btx-legacy #bodyarea .btx-pgbar .btx-jump input{font-size:16px}
+  body.btx-legacy #bodyarea .btx-pgbar td table > tbody > tr{justify-content:flex-start}
+}
+
+body.btx-legacy #bodyarea #quickModForm > table.bordercolor{background:transparent}
+body.btx-legacy #bodyarea td.msgcl1{padding:0 0 12px !important;background:transparent}
+body.btx-legacy #bodyarea td.msgcl1 > table{border-collapse:separate;border-spacing:0}
+body.btx-legacy #bodyarea td.msgcl1 > table > tbody > tr > td{border:1px solid var(--border);border-radius:16px;
+  background:var(--surface);box-shadow:var(--shadow)}
+
+body.btx-legacy #bodyarea .btx-pi-av div{overflow:visible !important;width:auto !important}
+body.btx-legacy #bodyarea .btx-st{display:inline-flex;vertical-align:middle;margin-left:6px}
+body.btx-legacy #bodyarea .btx-st img{display:block}
+
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pgbar > tbody > tr > td.btx-pgcell{flex:1 1 100%}
+  body.btx-legacy #bodyarea .btx-pgbar > tbody > tr > td:not(.btx-pgcell){flex:1 1 100%;text-align:left}
+  body.btx-legacy #bodyarea .btx-pgbar div.nav{justify-content:flex-start}
+  body.btx-legacy #bodyarea .btx-pgbar td table{margin-left:0}
+  body.btx-legacy #bodyarea td.msgcl1{padding-bottom:10px !important}
+  /* tabel pembungkus post dipaksa selebar layar agar kartu poster / judul / quote tidak terpotong */
+  body.btx-legacy #bodyarea #quickModForm table:has(.btx-ptable),
+  body.btx-legacy #bodyarea #quickModForm table:has(.btx-ptable) > tbody,
+  body.btx-legacy #bodyarea #quickModForm table:has(.btx-ptable) > tbody > tr,
+  body.btx-legacy #bodyarea #quickModForm table:has(.btx-ptable) > tbody > tr > td,
+  body.btx-legacy #bodyarea #quickModForm td.msgcl1{display:block;width:100% !important;max-width:100% !important;min-width:0;box-sizing:border-box}
+  /* signature tidak boleh melebarkan tabel di atasnya; ukurannya diatur oleh fitSignature() */
+  body.btx-legacy #bodyarea .btx-sighost{contain:inline-size !important;width:100% !important}
+  body.btx-legacy #bodyarea .btx-pi{width:100%;max-width:100%;box-sizing:border-box}
+  body.btx-legacy #bodyarea .td_headerandpost{min-width:0;max-width:100%;overflow-wrap:anywhere}
+  body.btx-legacy #bodyarea .td_headerandpost .post{max-width:100%;overflow-x:auto}
+  body.btx-legacy #bodyarea .td_headerandpost > table{display:block;width:100% !important}
+  body.btx-legacy #bodyarea .td_headerandpost > table > tbody{display:block}
+  body.btx-legacy #bodyarea .td_headerandpost > table > tbody > tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+  body.btx-legacy #bodyarea .td_headerandpost > table > tbody > tr > td{display:block;width:auto !important}
+  body.btx-legacy #bodyarea .td_headerandpost > table > tbody > tr > td:nth-child(2){flex:1 1 170px;min-width:0}
+  body.btx-legacy #bodyarea .td_headerandpost > table > tbody > tr > td.td_buttons{margin-left:auto;text-align:right}
+  body.btx-legacy #footerarea td{display:block;width:auto !important;white-space:normal !important;text-align:center !important}
+}
+@media(max-width:520px){
+  .btx-nav{gap:6px}
+  .btx-nav a{padding:7px 12px;font-size:13px}
 }
 
 @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
@@ -742,10 +875,11 @@ body.btx-legacy #bodyarea .btx-pi-acts img{vertical-align:middle}
   const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
   const prefs = {
     theme: store.get('theme', 'auto'),
-    accent: store.get('accent', 'lavender'),
+    accent: store.get('accent', 'bitcointalk'),
     compact: store.get('compact', false),
     desc: store.get('desc', true),
-    sig: store.get('sig', true)
+    sig: store.get('sig', true),
+    pinfo: store.get('pinfo', true)
   };
   const collapsed = store.get('collapsed', {});
 
@@ -760,7 +894,7 @@ body.btx-legacy #bodyarea .btx-pi-acts img{vertical-align:middle}
     document.body.classList.toggle('btx-compact', !!prefs.compact);
     document.body.classList.toggle('btx-nodesc', !prefs.desc);
     const m = document.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute('content', resolvedTheme() === 'dark' ? '#12131a' : '#f4f3fa');
+    if (m) m.setAttribute('content', resolvedTheme() === 'dark' ? '#12131a' : (prefs.accent === 'white' ? '#f4f3fa' : '#E5E5E8'));
     const tb = document.getElementById('btx-theme-btn');
     if (tb) { tb.innerHTML = ''; tb.append(icon(resolvedTheme() === 'dark' ? 'sun' : 'moon')); }
   }
@@ -787,7 +921,7 @@ body.btx-legacy #bodyarea .btx-pi-acts img{vertical-align:middle}
     });
 
     const swatches = h('div', { class: 'btx-swatches' });
-    [['lavender', '#7b82f0', 'Lavender'], ['mint', '#3fae9a', 'Mint'], ['peach', '#ee8566', 'Peach'], ['sky', '#4a9fe0', 'Sky']].forEach(([v, col, label]) => {
+    [['bitcointalk', '#476C8E', 'Bitcointalk'], ['white', '#ffffff', 'White'], ['lavender', '#7b82f0', 'Lavender'], ['mint', '#3fae9a', 'Mint'], ['peach', '#ee8566', 'Peach'], ['sky', '#4a9fe0', 'Sky']].forEach(([v, col, label]) => {
       const b = h('button', { class: 'btx-sw' + (prefs.accent === v ? ' on' : ''), style: 'background:' + col, 'aria-label': label, title: label, onclick: () => {
         setPref('accent', v);
         swatches.querySelectorAll('button').forEach((x) => x.classList.remove('on'));
@@ -823,6 +957,7 @@ body.btx-legacy #bodyarea .btx-pi-acts img{vertical-align:middle}
       h('div', { class: 'btx-row' }, toggle(L('showDesc'), 'desc')),
       h('div', { class: 'btx-row' }, toggle(L('compact'), 'compact')),
       h('div', { class: 'btx-row' }, toggle(L('sigOriginal'), 'sig', true)),
+      h('div', { class: 'btx-row' }, toggle(L('pinfoRebuild'), 'pinfo', true)),
       h('div', { class: 'btx-row' }, h('button', { class: 'btx-link', onclick: () => { store.set('enabled', false); location.reload(); } },
         L('backOrig')))
     ));
@@ -956,8 +1091,11 @@ body.btx-legacy #bodyarea .btx-pi-acts img{vertical-align:middle}
       const keep = [...td.querySelectorAll('a')].filter((a) => !a.classList.contains('navPages')).map((a) => a.cloneNode(true));
       const pg = buildPager(parsePager(td), true);
       if (!pg) return;
+      keep.forEach((a) => { a.classList.add('pg'); pg.append(a); });
       td.classList.add('btx-pgcell');
-      td.replaceChildren(pg, ...keep);
+      const bar = td.closest('table');
+      if (bar) bar.classList.add('btx-pgbar');
+      td.replaceChildren(pg);
     });
   }
 
@@ -971,68 +1109,142 @@ body.btx-legacy #bodyarea .btx-pi-acts img{vertical-align:middle}
   /* ------------------------------------------------------------------ *
    *  Halaman thread: tata ulang info poster (avatar utuh, tidak terpotong)
    * ------------------------------------------------------------------ */
-  function buildPoster(td) {
-    if (td.classList.contains('btx-pcell')) return;
-    const info = td.querySelector('div.smalltext');
-    const nameB = td.querySelector('b');
-    if (!info || !nameB) return;
+  // Membuat kartu dari KLONING info asli. Elemen asli tetap ada di DOM (disembunyikan)
+  // agar userscript/ekstensi lain tetap bisa menemukan dan mengubahnya.
+  function posterCard(td) {
+    const inCard = (n) => !!(n.closest && n.closest('.btx-pi'));
+    const info = [...td.querySelectorAll('div.smalltext')].find((d) => !inCard(d));
+    const nameEl = [...td.querySelectorAll('b')].find((x) => !inCard(x));
+    if (!info || !nameEl) return null;
 
-    // Pecah isi info poster menjadi baris-baris (dipisah <br>)
     const lines = [[]];
     [...info.childNodes].forEach((n) => {
       if (n.nodeType === 1 && n.tagName === 'BR') lines.push([]);
-      else lines[lines.length - 1].push(n);
+      else lines[lines.length - 1].push(n.cloneNode(true));
     });
 
     const lineText = (l) => l.map((n) => n.textContent).join('').replace(/\s+/g, ' ').trim();
     const hasEl = (l, sel) => l.some((n) => n.nodeType === 1 && (n.matches(sel) || n.querySelector(sel)));
 
-    const av = [], stars = [], acts = [], extraLines = [], stats = [];
+    const av = [], stars = [], acts = [], extraLines = [], stats = [], status = [];
     let rank = '', op = false, lastStat = null;
+
+    // Pecah teks gabungan seperti "Posts: 1606Score: 25% - Good" menjadi beberapa statistik
+    const splitStats = (t) => {
+      const re = /(Activity|Merit|Posts|Score)\s*:/gi;
+      const idx = [];
+      let m;
+      while ((m = re.exec(t))) idx.push({ k: m[1], start: m.index, end: m.index + m[0].length });
+      if (!idx.length || t.slice(0, idx[0].start).trim()) return null;
+      return idx.map((x, i) => ({ k: x.k, v: t.slice(x.end, i + 1 < idx.length ? idx[i + 1].start : undefined).trim() }));
+    };
+    const colorOf = (l) => {
+      for (const n of l) {
+        if (n.nodeType !== 1) continue;
+        for (const e of [n, ...n.querySelectorAll('*')]) {
+          const c = (e.style && e.style.color) || e.getAttribute('color');
+          if (c && /^[#\w(),.% -]+$/.test(c)) return c;
+        }
+      }
+      return '';
+    };
+    const addStat = (k, v, color) => {
+      v = v.replace(/\s+-\s+/g, ' \u2022 ').trim();
+      const ex = stats.find((x) => x.k.toLowerCase() === k.toLowerCase());
+      if (ex) { ex.v = v; if (color) ex.color = color; lastStat = ex; return; }
+      lastStat = { k, v, color };
+      stats.push(lastStat);
+    };
 
     lines.forEach((l) => {
       const t = lineText(l);
       if (hasEl(l, 'img.avatar')) { av.push(...l); return; }
-      if (!t && hasEl(l, 'img[src*="star"]')) { stars.push(...l); return; }
-      if (!t && hasEl(l, 'img, a')) { acts.push(...l); return; }
+      if (!t && hasEl(l, 'img[src*="useron"], img[src*="useroff"]')) { status.push(...l); return; }
+      if (!t && hasEl(l, 'img[src*="star"], img[alt="*"]')) { stars.push(...l); return; }
+      if (!t && hasEl(l, 'img, a, input, button, svg')) { acts.push(...l); return; }
       if (!t) return;
       if (/^\(OP\)$/i.test(t)) { op = true; return; }
-      const m = t.match(/^(Activity|Merit|Posts|Score)\s*:\s*(.*)$/i);
-      if (m) { lastStat = { k: m[1], v: m[2] }; stats.push(lastStat); return; }
-      if (lastStat && lastStat.k.toLowerCase() === 'score' && /^-\s*\S/.test(t)) {
-        lastStat.v += ' ' + t.replace(/^-\s*/, '\u2022 ');
+      const parts = splitStats(t);
+      if (parts) {
+        const col = colorOf(l);
+        parts.forEach((p, i) => addStat(p.k, p.v, i === parts.length - 1 ? col : ''));
         return;
       }
+      if (lastStat && lastStat.k.toLowerCase() === 'score' && /^-\s*\S/.test(t)) {
+        lastStat.v += ' \u2022 ' + t.replace(/^-\s*/, '');
+        return;
+      }
+      // Statistik tambahan dari script lain berbentuk "Label: nilai" -> jadi chip juga
+      const g = rank && t.length < 60 && t.match(/^([A-Za-z][A-Za-z0-9 ._\/%-]{0,22}):\s*(\S.*)$/);
+      if (g) { addStat(g[1], g[2], colorOf(l)); return; }
       if (/^Ignore$/i.test(t)) { acts.push(...l); return; }
       if (!rank && !stats.length && !extraLines.length) { rank = t; return; }
       extraLines.push(l);
     });
 
-    // Node lain di luar div.smalltext (selain nama & <br>)
+    // Node lain di luar div.smalltext (mis. ditambah script lain)
     const loose = [...td.childNodes].filter((n) =>
-      n !== nameB && n !== info && !(n.nodeType === 1 && n.tagName === 'BR') &&
-      !(n.nodeType === 3 && !n.textContent.trim()) && !(n.nodeType === 1 && n.contains(nameB)));
-    if (loose.length) extraLines.push(loose);
+      n !== nameEl && n !== info &&
+      !(n.nodeType === 1 && (n.tagName === 'BR' || n.classList.contains('btx-pi'))) &&
+      !(n.nodeType === 3 && !n.textContent.trim()) &&
+      !(n.nodeType === 1 && (n.contains(nameEl) || n.contains(info)))).map((n) => n.cloneNode(true));
+    const looseKeep = loose.filter((n) => {
+      if (/^\(OP\)$/i.test(n.textContent.trim())) { op = true; return false; }
+      return true;
+    });
+    if (looseKeep.length) extraLines.push(looseKeep);
 
     const extra = extraLines.map((l) => h('div', {}, l));
 
-    const pi = h('div', { class: 'btx-pi' + (av.length ? '' : ' noav') },
+    return h('div', { class: 'btx-pi' + (av.length ? '' : ' noav') },
       av.length > 0 && h('div', { class: 'btx-pi-av' }, av),
       h('div', { class: 'btx-pi-id' },
-        h('div', { class: 'btx-pi-name' }, nameB, op && h('span', { class: 'btx-op' }, 'OP')),
+        h('div', { class: 'btx-pi-name' }, nameEl.cloneNode(true), op && h('span', { class: 'btx-op' }, 'OP'),
+          status.length > 0 && h('span', { class: 'btx-st' }, status)),
         rank && h('div', { class: 'btx-pi-rank' }, rank),
         stars.length > 0 && h('div', { class: 'btx-pi-stars' }, stars),
-        stats.length > 0 && h('div', { class: 'btx-pi-stats' },
-          stats.map((s) => h('span', { class: 'btx-pi-stat' }, h('em', {}, s.k), h('b', {}, s.v))))
+        stats.length > 0 && h('div', { class: 'btx-pi-stats' + (stats.length > 5 ? ' many' : '') },
+          stats.map((s) => h('span', { class: 'btx-pi-stat' }, h('em', {}, s.k), h('b', { style: s.color ? 'color:' + s.color : null }, s.v))))
       ),
-      extra.length > 0 && h('div', { class: 'btx-pi-extra' }, extra),
+      extra.length > 0 && h('div', { class: 'btx-pi-extra' + (extra.length > 2 ? ' many' : '') }, extra),
       acts.length > 0 && h('div', { class: 'btx-pi-acts' }, acts)
     );
+  }
 
-    td.replaceChildren(pi);
+  function buildPoster(td) {
+    if (td.classList.contains('btx-pcell')) return;
     td.classList.add('btx-pcell');
     const tbl = td.closest('table');
     if (tbl) tbl.classList.add('btx-ptable');
+    if (!prefs.pinfo) return; // mode kompatibilitas: hanya perbaikan CSS
+
+    let mo = null, queued = false;
+    const draw = () => {
+      queued = false;
+      try {
+        const card = posterCard(td);
+        if (card) {
+          const old = td.querySelector(':scope > .btx-pi');
+          if (old) old.replaceWith(card); else td.prepend(card);
+          td.classList.add('btx-rebuilt');
+        }
+      } catch (e) { td.classList.remove('btx-rebuilt'); }
+      if (mo) mo.takeRecords(); // abaikan perubahan buatan kita sendiri
+    };
+    draw();
+
+    // Kalau script lain menambah/mengubah info poster belakangan, kartu ikut diperbarui
+    mo = new MutationObserver((recs) => {
+      if (queued) return;
+      const external = recs.some((r) => {
+        const e = r.target.nodeType === 1 ? r.target : r.target.parentElement;
+        return !(e && e.closest('.btx-pi'));
+      });
+      if (!external) return;
+      queued = true;
+      requestAnimationFrame(draw);
+    });
+    mo.observe(td, { childList: true, subtree: true, characterData: true });
   }
 
   function restylePosts() {
@@ -1065,6 +1277,38 @@ body.btx-legacy #bodyarea .btx-pi-acts img{vertical-align:middle}
     return siteCss;
   }
 
+  // Signature yang lebih lebar dari kartu DIPERKECIL (zoom) agar utuh, formatnya tidak diubah.
+  // Berlaku di desktop dan mobile.
+  const SIG_MOBILE = window.matchMedia ? window.matchMedia('(max-width:759px)') : null;
+  const SIG_ZOOM = !!(window.CSS && window.CSS.supports && window.CSS.supports('zoom', '0.5')); // 'CSS' lokal = string gaya, jadi pakai window.CSS
+  const sigList = [];
+  function fitSignature(entry) {
+    const { host, root } = entry;
+    const t = root.querySelector('table');
+    if (!t) return;
+    t.style.zoom = ''; t.style.transform = ''; t.style.transformOrigin = ''; t.style.width = '';
+    host.style.height = ''; host.style.overflow = '';
+    const cs = getComputedStyle(host);
+    const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+    const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const avail = host.clientWidth - padX;
+    const natural = Math.max(t.offsetWidth, t.scrollWidth);
+    if (avail <= 0 || natural <= avail + 1) return;
+    const raw = avail / natural;
+    const s = Math.max(0.3, raw);
+    // sudah muat setelah diperkecil -> sembunyikan scrollbar; kalau masih lebih lebar (batas 30%) tetap bisa digeser
+    host.style.overflow = raw >= 0.3 ? 'hidden' : 'auto';
+    if (SIG_ZOOM) {
+      t.style.zoom = s.toFixed(3);
+    } else {
+      // cadangan untuk browser tanpa CSS zoom: skala via transform, tinggi dihitung dari isi sebenarnya
+      t.style.width = natural + 'px';
+      t.style.transformOrigin = '0 0';
+      t.style.transform = 'scale(' + s.toFixed(3) + ')';
+      host.style.height = Math.ceil(t.getBoundingClientRect().height + padY) + 'px';
+    }
+  }
+
   function isolateSignatures() {
     if (!prefs.sig || !Element.prototype.attachShadow) return;
     const css = siteStyles();
@@ -1074,7 +1318,8 @@ body.btx-legacy #bodyarea .btx-pi-acts img{vertical-align:middle}
         const td = sig.closest('td');
         const tdClass = (td ? td.className : 'smalltext').replace(/\bwindowbg\d?\b/g, '').trim() || 'smalltext';
         const host = document.createElement('div');
-        host.style.cssText = 'all:initial;display:block;box-sizing:border-box;max-width:100%;overflow-x:auto;' +
+        host.className = 'btx-sighost';
+        host.style.cssText = 'all:initial;display:block;box-sizing:border-box;width:100%;max-width:100%;contain:inline-size;overflow-x:auto;' +
           'background:var(--btx-sigbg);padding:var(--btx-sigpad);border-radius:12px;color-scheme:light;';
         sig.parentNode.insertBefore(host, sig);
         const root = host.attachShadow({ mode: 'open' });
@@ -1082,8 +1327,25 @@ body.btx-legacy #bodyarea .btx-pi-acts img{vertical-align:middle}
         else css.nodes.forEach((n) => root.append(n.cloneNode(true)));
         root.append(h('table', { width: '100%', cellspacing: '0', cellpadding: '0', border: '0' },
           h('tbody', {}, h('tr', {}, h('td', { class: tdClass, style: 'background:transparent' }, sig)))));
+        const entry = { host, root };
+        sigList.push(entry);
+        root.addEventListener('load', () => fitSignature(entry), true); // gambar signature selesai dimuat
       } catch (e) { /* biarkan signature asli bila gagal */ }
     });
+    if (!sigList.length) return;
+    sigList.forEach(fitSignature);
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver((es) => es.forEach((e) => {
+        const en = sigList.find((x) => x.host === e.target);
+        if (en && en.w !== e.contentRect.width) { en.w = e.contentRect.width; fitSignature(en); }
+      }));
+      sigList.forEach((en) => ro.observe(en.host));
+    }
+    let timer = null;
+    const refit = () => { clearTimeout(timer); timer = setTimeout(() => sigList.forEach(fitSignature), 120); };
+    window.addEventListener('resize', refit);
+    window.addEventListener('load', refit);
+    if (SIG_MOBILE && SIG_MOBILE.addEventListener) SIG_MOBILE.addEventListener('change', refit);
   }
 
   function footer(extra) {
@@ -1110,9 +1372,10 @@ body.btx-legacy #bodyarea .btx-pi-acts img{vertical-align:middle}
     return sec;
   }
 
-  function buildIndex(cats, head, info, sheet) {
+  /* Kartu user (avatar + info) - tampil di SEMUA halaman seperti header forum asli */
+  function heroEl(head, compact) {
     const initial = (head.user || '?').charAt(0).toUpperCase();
-    const hero = h('section', { class: 'btx-hero' },
+    return h('section', { class: 'btx-hero' + (compact ? ' compact' : '') },
       h('div', { class: 'btx-hero-top' },
         head.avatar ? h('img', { class: 'btx-avatar', src: head.avatar, alt: '' }) : h('div', { class: 'btx-avatar' }, initial),
         h('div', { class: 'btx-hero-txt' },
@@ -1122,6 +1385,10 @@ body.btx-legacy #bodyarea .btx-pi-acts img{vertical-align:middle}
       ),
       quickRow(head, false)
     );
+  }
+
+  function buildIndex(cats, head, info, sheet) {
+    const hero = heroEl(head, false);
 
     const children = [hero];
     if (head.news) {
@@ -1210,7 +1477,7 @@ body.btx-legacy #bodyarea .btx-pi-acts img{vertical-align:middle}
   }
 
   function buildBoard(bp, head, sheet) {
-    const children = [navEl(head), quickRow(head, true)];
+    const children = [heroEl(head, true), navEl(head)];
 
     if (bp.crumbs.length) {
       const crumbs = h('nav', { class: 'btx-crumbs', 'aria-label': L('breadcrumb') });
@@ -1271,7 +1538,9 @@ body.btx-legacy #bodyarea .btx-pi-acts img{vertical-align:middle}
    * ------------------------------------------------------------------ */
   function buildShell(head, sheet) {
     return h('div', { id: 'btx-app' }, makeTopbar(sheet),
-      h('div', { class: 'btx-wrap btx-shellwrap' }, navEl(head), quickRow(head, true), h('div', { class: 'btx-tools' }, searchForm(head))),
+      h('div', { class: 'btx-wrap btx-shellwrap' }, heroEl(head, true),
+        h('div', { class: 'btx-shellbar' }, navEl(head),
+          h('div', { class: 'btx-shellsearch' }, searchForm(head)))),
       sheet.overlay);
   }
 
@@ -1304,7 +1573,7 @@ body.btx-legacy #bodyarea .btx-pi-acts img{vertical-align:middle}
       document.head.append(h('meta', { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' }));
     }
     if (!document.querySelector('meta[name="theme-color"]')) {
-      document.head.append(h('meta', { name: 'theme-color', content: '#f4f3fa' }));
+      document.head.append(h('meta', { name: 'theme-color', content: '#E5E5E8' }));
     }
     document.head.append(h('style', { id: 'btx-style' }, CSS));
     document.body.classList.add('btx');
