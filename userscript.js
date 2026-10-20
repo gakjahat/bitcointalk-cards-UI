@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bitcointalk Modern UI (Mobile Friendly)
 // @namespace    https://bitcointalk.org/
-// @version      1.4.13
+// @version      1.4.14
 // @description  Modern, mobile-friendly Bitcointalk UI: index, boards, neat thread posts (uncropped avatars) and a light/dark skin for every other page. Language: auto / English / Indonesia.
 // @author       Gak Jahat
 // @match        https://bitcointalk.org/*
@@ -9,6 +9,7 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
+// @license      Public/Free
 // ==/UserScript==
 
 (function () {
@@ -384,6 +385,7 @@
   --accent:#476C8E; --on-accent:#ffffff;
   --head-bg:#E9F0F6; --head-text:#000000; --head-border:#9BAEBF;
   --quote-bg:#f1f2f4; --quote-border:#d0d0e0;
+  --pin:#14b8a6; --unread:var(--accent);
   --btx-sigbg:transparent; --btx-sigpad:0px;
   --r-lg:20px; --r-md:14px; --r-sm:10px;
   color-scheme:light;
@@ -394,6 +396,7 @@
   --accent:#8fb4d9; --on-accent:#14152a;
   --head-bg:#242736; --head-text:#e8e9f4; --head-border:#2c2f42;
   --quote-bg:#242736; --quote-border:#2c2f42;
+  --pin:#2dd4bf;
   --btx-sigbg:#eceef5; --btx-sigpad:8px;
   color-scheme:dark;
 }
@@ -403,6 +406,8 @@
 :root[data-theme="dark"][data-accent="mint"]{--accent:#6fd3bf}
 :root[data-theme="dark"][data-accent="peach"]{--accent:#ffa488}
 :root[data-theme="dark"][data-accent="sky"]{--accent:#7bc0f5}
+:root[data-accent="mint"]{--unread:#ee8566}
+:root[data-theme="dark"][data-accent="mint"]{--unread:#ffa488}
 :root[data-accent="lavender"]{--accent:#7b82f0}
 :root[data-theme="dark"][data-accent="lavender"]{--accent:#9aa0ff}
 :root[data-theme="light"][data-accent="white"]{
@@ -589,8 +594,8 @@ body.btx-nodesc .btx-b-desc{display:none}
 .btx-topics{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);overflow:hidden}
 .btx-topic{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;padding:14px;border-top:1px solid var(--border);border-left:4px solid transparent;min-width:0}
 .btx-topic:first-child{border-top:0}
-.btx-topic[data-heat="1"]{border-left-color:color-mix(in srgb,var(--accent) 40%,transparent)}
-.btx-topic[data-heat="2"]{border-left-color:var(--accent)}
+.btx-topic.sticky{border-left-color:var(--pin)}
+.btx-topic.unread{border-left-color:var(--unread)}
 .btx-topic.sticky{background:color-mix(in srgb,var(--accent) 6%,var(--surface))}
 .btx-t-main{min-width:0}
 .btx-t-title{display:block;font-weight:650;font-size:15.5px;line-height:1.35;overflow-wrap:anywhere}
@@ -1463,7 +1468,7 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
     if (t.poll) tags.push(h('span', { class: 'btx-tag' }, L('poll')));
     if (t.unread) tags.push(h('a', { class: 'btx-tag new', href: t.newHref || t.href }, L('newTag')));
 
-    return h('article', { class: 'btx-topic' + (t.sticky ? ' sticky' : ''), 'data-heat': t.heat, 'data-s': (t.title + ' ' + t.starter).toLowerCase() },
+    return h('article', { class: 'btx-topic' + (t.sticky ? ' sticky' : '') + (t.unread ? ' unread' : ''), 'data-heat': t.heat, 'data-s': (t.title + ' ' + t.starter).toLowerCase() },
       h('div', { class: 'btx-t-main' },
         h('a', { class: 'btx-t-title', href: t.href }, t.title),
         tags.length > 0 && h('div', { class: 'btx-tags' }, tags),
