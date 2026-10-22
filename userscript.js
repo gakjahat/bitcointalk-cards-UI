@@ -1,15 +1,19 @@
 // ==UserScript==
 // @name         Bitcointalk Modern UI (Mobile Friendly)
 // @namespace    https://bitcointalk.org/
-// @version      1.4.14
-// @description  Modern, mobile-friendly Bitcointalk UI: index, boards, neat thread posts (uncropped avatars) and a light/dark skin for every other page. Language: auto / English / Indonesia.
+// @version      1.5.0
+// @description  Modern, mobile-friendly Bitcointalk UI: index, boards, neat thread posts (uncropped avatars), a light/dark skin for every other page, and BitList archive search shown right on the page. Language: auto / English / Indonesia.
 // @author       Gak Jahat
 // @match        https://bitcointalk.org/*
 // @run-at       document-end
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
+// @grant        GM_xmlhttpRequest
+// @connect      bitlist.co
 // @license      Public/Free
+// @downloadURL https://update.greasyfork.org/scripts/601150/Bitcointalk%20Modern%20UI%20%28Mobile%20Friendly%29.user.js
+// @updateURL https://update.greasyfork.org/scripts/601150/Bitcointalk%20Modern%20UI%20%28Mobile%20Friendly%29.meta.js
 // ==/UserScript==
 
 (function () {
@@ -57,6 +61,10 @@
       noTopic: 'No matching topics.', emptyBoard: 'No topics in this board yet.',
       sigOriginal: 'Keep signatures in original look',
       pinfoRebuild: 'Rebuild poster info (turn off if another script conflicts)',
+      blSearch: 'Search BitList archive\u2026', blTitle: 'BitList results', blOpen: 'Open in BitList',
+      blInline: 'Show BitList results on this page (off = new tab)', blLoading: 'Loading\u2026',
+      blFail: 'Could not load BitList results here. Use the button above to open BitList.',
+      blNone: 'No results.', blDeleted: 'Deleted', blOf: 'of', blResults: 'results',
       actMap: {}, sortMap: {}
     },
     id: {
@@ -78,6 +86,10 @@
       noTopic: 'Tidak ada topik yang cocok.', emptyBoard: 'Belum ada topik di board ini.',
       sigOriginal: 'Signature tampil seperti aslinya',
       pinfoRebuild: 'Tata ulang info poster (matikan jika bentrok dengan script lain)',
+      blSearch: 'Cari di arsip BitList\u2026', blTitle: 'Hasil BitList', blOpen: 'Buka di BitList',
+      blInline: 'Tampilkan hasil BitList di halaman ini (mati = tab baru)', blLoading: 'Memuat\u2026',
+      blFail: 'Hasil BitList tidak bisa dimuat di sini. Pakai tombol di atas untuk membuka BitList.',
+      blNone: 'Tidak ada hasil.', blDeleted: 'Dihapus', blOf: 'dari', blResults: 'hasil',
       actMap: { 'New Topic': 'Topik baru', 'Post new poll': 'Polling baru', 'Mark Read': 'Tandai dibaca', 'Notify': 'Notifikasi' },
       sortMap: { 'Subject': 'Judul', 'Started by': 'Pembuat', 'Replies': 'Balasan', 'Views': 'Dilihat', 'Last post': 'Terakhir' }
     }
@@ -460,7 +472,7 @@ body.btx-full > *:not(#btx-app){display:none !important}
 /* shell (halaman non-index/board): nav di kiri, search di kanan; mobile ditumpuk */
 .btx-shellbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-top:12px}
 .btx-shellbar .btx-nav{margin:0;padding:0;flex:1 1 auto;min-width:0}
-.btx-shellsearch{flex:0 1 340px;min-width:240px;margin-left:auto}
+.btx-shellsearch{flex:0 1 340px;min-width:240px;margin-left:auto;display:grid;gap:8px}
 .btx-shellsearch .btx-field{height:42px}
 @media(max-width:699px){
   .btx-shellbar{flex-direction:column;align-items:stretch;gap:10px}
@@ -503,7 +515,7 @@ div.btx-avatar{display:grid;place-items:center;width:64px;height:64px;font-weigh
 
 /* search + filter */
 .btx-tools{display:grid;gap:10px;margin-top:12px}
-@media(min-width:700px){.btx-tools{grid-template-columns:1fr 1fr}}
+.btx-tools{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
 .btx-field{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);
   border-radius:14px;padding:0 6px 0 14px;height:46px;color:var(--muted);min-width:0}
 .btx-field:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}
@@ -655,6 +667,24 @@ body.btx-legacy #bodyarea td.btx-pgcell{padding:6px 0}
 .btx-switch button.on::after{transform:translateX(20px)}
 .btx-link{background:transparent;border:0;color:var(--muted);font-size:13px;text-decoration:underline;padding:0}
 
+/* ===== Panel hasil BitList ===== */
+.btx-blsheet{max-width:860px;max-height:88vh;overflow:auto;padding-top:14px}
+.btx-bl-actions{display:flex;align-items:center;gap:8px}
+.btx-bl-sum{font-size:13px;color:var(--muted);margin:6px 0 10px}
+.btx-bl-item{border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);padding:12px;margin-top:10px;min-width:0}
+.btx-bl-title{display:block;font-weight:700;font-size:15px;line-height:1.35;overflow-wrap:anywhere}
+.btx-bl-title:hover{color:var(--accent)}
+.btx-bl-meta{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin-top:4px;font-size:12px;color:var(--muted)}
+.btx-bl-meta b{color:var(--text)}
+.btx-bl-meta a{color:var(--accent) !important}
+.btx-bl-post{margin-top:8px;font-size:14px;max-height:320px;overflow:auto;overflow-wrap:anywhere}
+.btx-bl-post a{color:var(--accent) !important;text-decoration:underline}
+.btx-bl-post .quote,.btx-bl-post .quoteheader{background:var(--quote-bg);border:1px solid var(--quote-border);border-radius:8px;padding:6px 10px;margin:6px 0;font-size:13px}
+.btx-bl-post .quoteheader{margin-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0;color:var(--muted)}
+.btx-bl-post .quoteheader + .quote{margin-top:0;border-top-left-radius:0;border-top-right-radius:0}
+.btx-bl-msg{margin:24px 0;text-align:center;color:var(--muted)}
+.btx-tag.bad{background:#c0392b;color:#fff !important}
+
 /* ===== Skin untuk halaman lain (topik, help, profil, dll) ===== */
 body.btx-legacy{margin:0;background:var(--bg);color:var(--text);
   font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;-webkit-text-size-adjust:100%}
@@ -794,7 +824,7 @@ body.btx-legacy #bodyarea .btx-pcell:not(.btx-rebuilt) img.avatar{max-width:100%
 /* ===== Thread: bar pager + aksi, kartu post, tampilan mobile ===== */
 body.btx-legacy #bodyarea .mirrortab_back,body.btx-legacy #bodyarea .maintab_back{font-size:0 !important;line-height:0}
 body.btx-legacy #bodyarea .mirrortab_back a,body.btx-legacy #bodyarea .maintab_back a{font-size:13px;line-height:1.4;margin:3px 6px 3px 0}
-body.btx-legacy #bodyarea .btx-pgbar,body.btx-legacy #bodyarea .btx-pgbar > tbody{display:block;width:100% !important}
+body.btx-legacy #bodyarea .btx-pgbar,body.btx-legacy #bodyarea .btx-pgbar > tbody{display:block;width:100% !important;margin-bottom:14px}
 body.btx-legacy #bodyarea .btx-pgbar > tbody > tr{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 16px}
 body.btx-legacy #bodyarea .btx-pgbar > tbody > tr > td{display:block;width:auto !important;min-width:0;padding:0 !important}
 body.btx-legacy #bodyarea .btx-pgbar > tbody > tr > td.btx-pgcell{flex:1 1 360px}
@@ -886,7 +916,8 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
     compact: store.get('compact', false),
     desc: store.get('desc', true),
     sig: store.get('sig', true),
-    pinfo: store.get('pinfo', true)
+    pinfo: store.get('pinfo', true),
+    blinline: store.get('blinline', true)
   };
   const collapsed = store.get('collapsed', {});
 
@@ -963,6 +994,7 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
       h('div', { class: 'btx-row' }, h('span', { class: 'lbl' }, L('accent')), swatches),
       h('div', { class: 'btx-row' }, toggle(L('showDesc'), 'desc')),
       h('div', { class: 'btx-row' }, toggle(L('compact'), 'compact')),
+      h('div', { class: 'btx-row' }, toggle(L('blInline'), 'blinline')),
       h('div', { class: 'btx-row' }, toggle(L('sigOriginal'), 'sig', true)),
       h('div', { class: 'btx-row' }, toggle(L('pinfoRebuild'), 'pinfo', true)),
       h('div', { class: 'btx-row' }, h('button', { class: 'btx-link', onclick: () => { store.set('enabled', false); location.reload(); } },
@@ -1360,6 +1392,152 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
   }
 
   /* ------------------------------------------------------------------ *
+   *  BitList: cari di bitlist.co, tampilkan hasilnya di halaman ini
+   * ------------------------------------------------------------------ */
+  const BL_HOST = 'https://bitlist.co';
+  const blUrl = (q, page) => BL_HOST + '/search?content=' + encodeURIComponent(q) + '&limit=20' + (page > 1 ? '&page=' + page : '');
+
+  function blRequest(url) {
+    return new Promise((resolve, reject) => {
+      if (typeof GM_xmlhttpRequest !== 'function') return reject(new Error('no GM_xmlhttpRequest'));
+      GM_xmlhttpRequest({
+        method: 'GET', url, timeout: 20000, headers: { Accept: 'text/html' },
+        onload: (r) => (r.status >= 200 && r.status < 300) ? resolve(r.responseText) : reject(new Error('HTTP ' + r.status)),
+        onerror: () => reject(new Error('network')),
+        ontimeout: () => reject(new Error('timeout'))
+      });
+    });
+  }
+
+  // Bersihkan HTML post: hanya tag aman, tanpa atribut selain href
+  const BL_TAGS = new Set(['B', 'I', 'U', 'S', 'BR', 'A', 'DIV', 'SPAN', 'UL', 'OL', 'LI', 'PRE', 'CODE', 'STRONG', 'EM', 'CENTER']);
+  function blClean(node) {
+    const out = document.createDocumentFragment();
+    node.childNodes.forEach((n) => {
+      if (n.nodeType === 3) { out.append(document.createTextNode(n.textContent)); return; }
+      if (n.nodeType !== 1 || n.tagName === 'SCRIPT' || n.tagName === 'STYLE') return;
+      if (n.tagName === 'IMG') {
+        const src = n.getAttribute('src') || '';
+        if (/^https?:\/\//i.test(src) && !/Smileys/i.test(src)) {
+          out.append(h('a', { href: src, target: '_blank', rel: 'noopener noreferrer nofollow' }, '[img]'));
+        }
+        return;
+      }
+      if (!BL_TAGS.has(n.tagName)) { out.append(blClean(n)); return; }
+      const e = document.createElement(n.tagName.toLowerCase());
+      if (n.tagName === 'A') {
+        let href = n.getAttribute('href') || '';
+        if (href.startsWith('/post/')) href = BL_HOST + href;
+        if (/^https?:\/\//i.test(href)) { e.href = href; e.target = '_blank'; e.rel = 'noopener noreferrer nofollow'; }
+      }
+      if (n.tagName === 'DIV' && (n.className === 'quote' || n.className === 'quoteheader')) e.className = n.className;
+      e.append(blClean(n));
+      out.append(e);
+    });
+    return out;
+  }
+
+  function blParse(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const genuine = /data-sveltekit|BitList/i.test(html);
+    const items = [];
+    doc.querySelectorAll('div.post').forEach((p) => {
+      const card = p.closest('div.overflow-hidden');
+      if (!card) return;
+      const head = card.querySelector('div.bg-card-accent');
+      const t = head && head.querySelector(':scope > a');
+      const au = head && head.querySelector('a[href*="action=profile"]');
+      const dates = head ? [...head.querySelectorAll('span.font-semibold')] : [];
+      const idA = [...card.querySelectorAll('a[href^="/post/"]')].find((a) => /^\/post\/\d+$/.test(a.getAttribute('href')));
+      const merit = card.querySelector('button[title="Open merit logs"]');
+      const body = p.querySelector('.pb-4') || p;
+      const href = t ? t.getAttribute('href') || '' : '';
+      items.push({
+        title: txt(t) || '(no title)',
+        href: /^https:\/\/bitcointalk\.org\//.test(href) ? href : (idA ? BL_HOST + idA.getAttribute('href') : BL_HOST),
+        author: txt(au),
+        date: txt(dates[dates.length - 1]),
+        postHref: idA ? BL_HOST + idA.getAttribute('href') + '/versions' : '',
+        deleted: [...card.querySelectorAll('span')].some((s) => txt(s) === 'DELETED'),
+        merit: txt(merit),
+        body
+      });
+    });
+    const m = txt(doc.body).match(/Showing\s*([\d,]+)\s*-\s*([\d,]+)\s*of\s*([\d,]+)\s*results/i);
+    const total = m ? parseInt(m[3].replace(/,/g, ''), 10) : items.length;
+    return { genuine, items, total, pages: Math.min(500, Math.max(1, Math.ceil(total / 20))) };
+  }
+
+  let blUi = null;
+  function blUI() {
+    if (blUi) return blUi;
+    const body = h('div', { class: 'btx-bl-body' });
+    const openA = h('a', { class: 'btx-btn', target: '_blank', rel: 'noopener', href: BL_HOST + '/search' }, L('blOpen'));
+    let overlay = null;
+    const close = () => overlay.classList.remove('open');
+    const sheet = h('div', { class: 'btx-sheet btx-blsheet' },
+      h('div', { class: 'btx-sheet-h' }, h('h3', {}, L('blTitle')),
+        h('div', { class: 'btx-bl-actions' }, openA,
+          h('button', { class: 'btx-iconbtn', onclick: close, 'aria-label': L('close') }, icon('close')))),
+      body);
+    overlay = h('div', { class: 'btx-overlay', id: 'btx-bl', role: 'dialog', 'aria-modal': 'true', 'aria-label': L('blTitle') }, sheet);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    (document.getElementById('btx-app') || document.body).append(overlay);
+
+    const msg = (t) => body.replaceChildren(h('p', { class: 'btx-bl-msg' }, t));
+    blUi = {
+      open: () => overlay.classList.add('open'),
+      link: (u) => { openA.href = u; },
+      loading: () => msg(L('blLoading')),
+      error: () => msg(L('blFail')),
+      render(data, q, page) {
+        sheet.scrollTop = 0;
+        const kids = [h('p', { class: 'btx-bl-sum' }, '\u201C' + q + '\u201D \u2022 ' + num(data.total) + ' ' + L('blResults') + ' \u2022 ' + page + ' / ' + data.pages)];
+        if (!data.items.length) { kids.push(h('p', { class: 'btx-bl-msg' }, L('blNone'))); body.replaceChildren(...kids); return; }
+        data.items.forEach((it) => kids.push(h('article', { class: 'btx-bl-item' },
+          h('a', { class: 'btx-bl-title', href: it.href, target: '_blank', rel: 'noopener' }, it.title),
+          h('div', { class: 'btx-bl-meta' }, L('by'), h('b', {}, it.author), '\u2022', it.date,
+            it.deleted && h('span', { class: 'btx-tag bad' }, L('blDeleted')),
+            it.merit && h('span', { class: 'btx-tag' }, '\u2605 ' + it.merit),
+            it.postHref && h('a', { href: it.postHref, target: '_blank', rel: 'noopener' }, 'BitList')),
+          h('div', { class: 'btx-bl-post' }, blClean(it.body)))));
+        const nav = h('nav', { class: 'btx-pager btx-pager2', 'aria-label': L('pages') });
+        const go = (n) => h('button', { class: 'pg', onclick: () => blSearch(q, n) }, String(n));
+        if (page > 1) nav.append(h('button', { class: 'pg nav', onclick: () => blSearch(q, page - 1) }, '\u2039 ', h('span', { class: 't' }, L('prev'))));
+        nav.append(h('span', { class: 'pg on' }, String(page)));
+        if (page < data.pages) nav.append(go(page + 1), h('button', { class: 'pg nav', onclick: () => blSearch(q, page + 1) }, h('span', { class: 't' }, L('next')), ' \u203A'));
+        kids.push(nav);
+        body.replaceChildren(...kids);
+      }
+    };
+    return blUi;
+  }
+
+  async function blSearch(q, page) {
+    q = (q || '').trim(); page = page || 1;
+    if (!q) return;
+    const url = blUrl(q, page);
+    if (!prefs.blinline) { window.open(url, '_blank', 'noopener'); return; }
+    const ui = blUI();
+    ui.link(url); ui.open(); ui.loading();
+    try {
+      const data = blParse(await blRequest(url));
+      if (!data.genuine || (!data.items.length && data.total > 0)) throw new Error('unparsable');
+      ui.render(data, q, page);
+    } catch (e) {
+      ui.error();
+      window.open(url, '_blank', 'noopener'); // bisa diblokir popup blocker; tombol "Buka di BitList" tetap ada
+    }
+  }
+
+  function blForm() {
+    const input = h('input', { type: 'search', placeholder: L('blSearch'), 'aria-label': L('blSearch'), enterkeyhint: 'search', autocomplete: 'off' });
+    return h('form', { class: 'btx-field', onsubmit: (e) => { e.preventDefault(); blSearch(input.value, 1); } },
+      icon('search'), input, h('button', { class: 'btx-go', type: 'submit' }, 'BitList'));
+  }
+
+  /* ------------------------------------------------------------------ *
    *  Halaman: indeks
    * ------------------------------------------------------------------ */
   function categorySection(cat) {
@@ -1406,7 +1584,7 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
     children.push(navEl(head));
 
     const filter = filterField(L('filterBoards'));
-    children.push(h('div', { class: 'btx-tools' }, searchForm(head), filter.el));
+    children.push(h('div', { class: 'btx-tools' }, searchForm(head), blForm(), filter.el));
 
     const catWrap = h('div', { id: 'btx-cats' }, cats.map(categorySection));
     const empty = h('p', { class: 'btx-empty', hidden: true }, L('noBoard'));
@@ -1506,7 +1684,7 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
     ));
 
     const filter = filterField(L('filterTopics'));
-    children.push(h('div', { class: 'btx-tools' }, searchForm(head), filter.el));
+    children.push(h('div', { class: 'btx-tools' }, searchForm(head), blForm(), filter.el));
 
     if (bp.children.length) {
       children.push(h('h2', { class: 'btx-sec-h' }, L('childBoards')), h('div', { class: 'btx-grid' }, bp.children.map(boardCard)));
@@ -1547,7 +1725,7 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
     return h('div', { id: 'btx-app' }, makeTopbar(sheet),
       h('div', { class: 'btx-wrap btx-shellwrap' }, heroEl(head, true),
         h('div', { class: 'btx-shellbar' }, navEl(head),
-          h('div', { class: 'btx-shellsearch' }, searchForm(head)))),
+          h('div', { class: 'btx-shellsearch' }, searchForm(head), blForm()))),
       sheet.overlay);
   }
 
