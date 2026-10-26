@@ -780,6 +780,8 @@ body.btx-legacy #bodyarea table{max-width:100%}
 body.btx-legacy #footerarea{color:var(--muted);padding:0 14px 28px}
 body.btx-legacy #footerarea img{display:none}
 body.btx-legacy #footerarea a{color:var(--muted)}
+body.btx-legacy #bodyarea .btx-line{display:inline-block; white-space:nowrap; vertical-align:baseline;
+}
 
 /* ===== Signature mode sederhana (browser/WebView lawas tanpa Shadow DOM modern) =====
    Signature tetap di tempatnya & selalu terlihat; hanya dibatasi lebarnya agar bisa digeser. */
@@ -1546,6 +1548,83 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
     }, 500);
   }
 
+    /* ------------------------------------------------------------------ *
+ *  Garis dekoratif ═ ─ ━ yang terlalu panjang di layar sempit:
+ *  potong jumlah karakternya sampai pas satu baris (tidak merusak
+ *  konten asli — otomatis penuh lagi kalau layar dilebarkan).
+ * ------------------------------------------------------------------ */
+function setupDividers() {
+  const RUN = /[\u2500-\u257F]{15,}/g;   // box-drawing, min. 15 char
+  const wraps = [];
+
+  document.querySelectorAll('#bodyarea .post').forEach((post) => {
+    const walker = document.createTreeWalker(post, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    let n;
+    while ((n = walker.nextNode())) {
+      if (!n.nodeValue || n.nodeValue.length < 15) continue;
+      const p = n.parentElement;
+      // jangan sentuh <pre>, <code>, signature, atau glowbox (biar tidak bentrok)
+      if (p && p.closest('pre, code, .code, .signature, .btx-glowbox')) continue;
+      RUN.lastIndex = 0;
+      if (!RUN.test(n.nodeValue)) continue;
+      nodes.push(n);
+    }
+
+    nodes.forEach((tn) => {
+      const text = tn.nodeValue;
+      const frag = document.createDocumentFragment();
+      let last = 0, m;
+      RUN.lastIndex = 0;
+      while ((m = RUN.exec(text))) {
+        if (m.index > last) frag.append(text.slice(last, m.index));
+        const span = document.createElement('span');
+        span.className = 'btx-line';
+        span.dataset.orig = m[0];        // simpan versi penuh
+        span.textContent = m[0];
+        frag.append(span);
+        wraps.push(span);
+        last = m.index + m[0].length;
+      }
+      if (last < text.length) frag.append(text.slice(last));
+      tn.parentNode.replaceChild(frag, tn);
+    });
+  });
+
+  if (!wraps.length) return;
+
+  const fit = () => {
+    wraps.forEach((span) => {
+      if (!span.isConnected) return;
+      const orig = span.dataset.orig;
+      if (!orig) return;
+
+      // reset ke versi penuh dulu -> bisa re-evaluasi saat resize
+      span.textContent = orig;
+      span.style.display = 'inline-block';
+      span.style.whiteSpace = 'nowrap';
+
+      const post = span.closest('.post') || span.parentElement;
+      if (!post) return;
+
+      const avail = post.clientWidth;
+      const w = span.offsetWidth;
+      if (w <= avail + 1) return;        // masih muat -> biarkan penuh
+
+      const charW = w / orig.length;
+      const maxChars = Math.max(5, Math.floor(avail / charW));
+      if (maxChars >= orig.length) return;
+      span.textContent = orig.slice(0, maxChars);   // potong sesuai lebar
+    });
+  };
+
+  requestAnimationFrame(fit);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+  let t = null;
+  window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(fit, 150); });
+  [500, 1500, 3000].forEach((ms) => setTimeout(fit, ms));
+}
+
   /* ------------------------------------------------------------------ *
    *  Teks glow di isi post, mis. [glow][color=transparent]......[/color] JUDUL [color=transparent]......[/color][/glow]
    *  Titik transparan sengaja dipakai sebagai "lebar" batang. Di layar sempit ia terbungkus jadi 2 baris,
@@ -2021,6 +2100,7 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
       safe(restylePosts);
       safe(isolateSignatures);
       safe(setupGlows);
+      safe(setupDividers);
     }
 
     applyPrefs();
