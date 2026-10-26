@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Bitcointalk Modern UI (Mobile Friendly)
 // @namespace    https://bitcointalk.org/
-// @version      1.5.0
+// @version      1.5.2
 // @description  Modern, mobile-friendly Bitcointalk UI: index, boards, neat thread posts (uncropped avatars), a light/dark skin for every other page, and BitList archive search shown right on the page. Language: auto / English / Indonesia.
 // @author       Gak Jahat
 // @match        https://bitcointalk.org/*
-// @run-at       document-end
+// @run-at       document-start
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
@@ -18,6 +18,30 @@
 
 (function () {
   'use strict';
+
+  /* ------------------------------------------------------------------ *
+   *  Polyfill kecil untuk browser / WebView ponsel lawas
+   * ------------------------------------------------------------------ */
+  try {
+    if (!Element.prototype.replaceChildren) {
+      Element.prototype.replaceChildren = function () {
+        while (this.firstChild) this.removeChild(this.firstChild);
+        for (let i = 0; i < arguments.length; i++) {
+          const n = arguments[i];
+          this.appendChild(n && n.nodeType ? n : document.createTextNode(String(n)));
+        }
+      };
+    }
+  } catch (e) { /* abaikan */ }
+
+  const flatten = (arr, out) => {
+    out = out || [];
+    for (let i = 0; i < arr.length; i++) {
+      if (Array.isArray(arr[i])) flatten(arr[i], out); else out.push(arr[i]);
+    }
+    return out;
+  };
+  const safe = (fn) => { try { fn(); } catch (e) { if (window.console) console.error('[btx]', e); } };
 
   /* ------------------------------------------------------------------ *
    *  Penyimpanan pengaturan
@@ -62,6 +86,7 @@
       sigOriginal: 'Keep signatures in original look',
       pinfoRebuild: 'Rebuild poster info (turn off if another script conflicts)',
       blSearch: 'Search BitList archive\u2026', blTitle: 'BitList results', blOpen: 'Open in BitList',
+      blEnable: 'Enable BitList search', blMenu: 'BitList search: ',
       blInline: 'Show BitList results on this page (off = new tab)', blLoading: 'Loading\u2026',
       blFail: 'Could not load BitList results here. Use the button above to open BitList.',
       blNone: 'No results.', blDeleted: 'Deleted', blOf: 'of', blResults: 'results',
@@ -87,6 +112,7 @@
       sigOriginal: 'Signature tampil seperti aslinya',
       pinfoRebuild: 'Tata ulang info poster (matikan jika bentrok dengan script lain)',
       blSearch: 'Cari di arsip BitList\u2026', blTitle: 'Hasil BitList', blOpen: 'Buka di BitList',
+      blEnable: 'Aktifkan pencarian BitList', blMenu: 'Pencarian BitList: ',
       blInline: 'Tampilkan hasil BitList di halaman ini (mati = tab baru)', blLoading: 'Memuat\u2026',
       blFail: 'Hasil BitList tidak bisa dimuat di sini. Pakai tombol di atas untuk membuka BitList.',
       blNone: 'Tidak ada hasil.', blDeleted: 'Dihapus', blOf: 'dari', blResults: 'hasil',
@@ -112,6 +138,32 @@
   if (!store.get('enabled', true)) return;
 
   /* ------------------------------------------------------------------ *
+   *  Anti-flash: script jalan di document-start, jadi halaman asli
+   *  langsung disembunyikan sampai UI modern selesai dibangun.
+   *  Ada pengaman: otomatis ditampilkan lagi bila terjadi error / terlalu lama.
+   * ------------------------------------------------------------------ */
+  const BOOT_ID = 'btx-boot-style';
+  safe(() => {
+    const t = store.get('theme', 'auto');
+    const acc = store.get('accent', 'bitcointalk');
+    const dark = t === 'dark' || (t === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const bg = dark ? '#12131a' : (acc === 'white' ? '#f4f3fa' : '#E5E5E8');
+    const st = document.createElement('style');
+    st.id = BOOT_ID;
+    st.textContent = 'html.btx-boot{visibility:hidden !important;background:' + bg + ' !important}';
+    (document.head || document.documentElement).appendChild(st);
+    document.documentElement.classList.add('btx-boot');
+  });
+  function unboot() {
+    safe(() => {
+      document.documentElement.classList.remove('btx-boot');
+      const s = document.getElementById(BOOT_ID);
+      if (s && s.parentNode) s.parentNode.removeChild(s);
+    });
+  }
+  setTimeout(unboot, 6000); // pengaman terakhir
+
+  /* ------------------------------------------------------------------ *
    *  Helper
    * ------------------------------------------------------------------ */
   const txt = (el) => ((el && el.textContent) || '').replace(/\s+/g, ' ').trim();
@@ -127,7 +179,7 @@
       else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
       else e.setAttribute(k, v === true ? '' : v);
     }
-    for (const c of kids.flat()) {
+    for (const c of flatten(kids)) {
       if (c == null || c === false) continue;
       e.append(c.nodeType ? c : document.createTextNode(c));
     }
@@ -610,8 +662,10 @@ body.btx-nodesc .btx-b-desc{display:none}
 .btx-topic.unread{border-left-color:var(--unread)}
 .btx-topic.sticky{background:color-mix(in srgb,var(--accent) 6%,var(--surface))}
 .btx-t-main{min-width:0}
-.btx-t-title{display:block;font-weight:650;font-size:15.5px;line-height:1.35;overflow-wrap:anywhere}
-.btx-t-title:hover{color:var(--accent)}
+.btx-t-title{display:block;font-weight:400;font-size:15.5px;line-height:1.35;overflow-wrap:anywhere}
+.btx-topic.unread .btx-t-title{font-weight:700}
+.btx-topic.sticky .btx-t-title{color:var(--accent) !important}
+.btx-t-title:hover{color:var(--accent) !important}
 .btx-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .btx-tag{font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:999px;background:var(--surface2);color:var(--muted) !important}
 .btx-tag.new{background:var(--accent);color:var(--on-accent) !important}
@@ -727,6 +781,14 @@ body.btx-legacy #footerarea{color:var(--muted);padding:0 14px 28px}
 body.btx-legacy #footerarea img{display:none}
 body.btx-legacy #footerarea a{color:var(--muted)}
 
+/* ===== Signature mode sederhana (browser/WebView lawas tanpa Shadow DOM modern) =====
+   Signature tetap di tempatnya & selalu terlihat; hanya dibatasi lebarnya agar bisa digeser. */
+body.btx-legacy #bodyarea .btx-sigplain{display:block !important;visibility:visible !important;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+body.btx-legacy #bodyarea .btx-sigplain img{max-width:100%;height:auto}
+:root[data-theme="dark"] body.btx-legacy #bodyarea .btx-sigplain{background:#eceef5;padding:8px;border-radius:12px;color:#000}
+:root[data-theme="dark"] body.btx-legacy #bodyarea .btx-sigplain *{color:#000}
+:root[data-theme="dark"] body.btx-legacy #bodyarea .btx-sigplain a{color:#0645ad}
+
 /* ===== Formulir (balas, topik baru, pengaturan profil) ===== */
 body.btx-legacy #bodyarea form{max-width:100%}
 body.btx-legacy #bodyarea textarea{display:block;width:100%;max-width:100%;min-width:0;min-height:220px;box-sizing:border-box;resize:vertical;line-height:1.5}
@@ -773,6 +835,7 @@ body.btx-legacy #bodyarea .btx-pi-stars img{vertical-align:middle}
 body.btx-legacy #bodyarea .btx-pi-stats{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;margin-top:4px;max-width:100%}
 body.btx-legacy #bodyarea .btx-pi-stat{display:inline-flex;align-items:baseline;gap:4px;padding:2px 8px;border-radius:999px;
   background:var(--surface2);font-size:11px;line-height:1.45;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+body.btx-legacy #bodyarea .btx-pi,body.btx-legacy #bodyarea .btx-pi *{box-sizing:border-box}
 body.btx-legacy #bodyarea .btx-pi > *{min-width:0;max-width:100%}
 body.btx-legacy #bodyarea .btx-pi-extra *,body.btx-legacy #bodyarea .btx-pi-acts *{max-width:100%;overflow-wrap:anywhere}
 body.btx-legacy #bodyarea .btx-pi-extra img,body.btx-legacy #bodyarea .btx-pi-acts img{height:auto}
@@ -780,7 +843,7 @@ body.btx-legacy #bodyarea .btx-pi-extra table{width:auto !important;table-layout
 body.btx-legacy #bodyarea .btx-pi-stat em{font-style:normal;color:var(--muted)}
 body.btx-legacy #bodyarea .btx-pi-stat b{font-weight:700;color:var(--text)}
 body.btx-legacy #bodyarea .btx-pi-extra{order:2;width:100%;display:flex;flex-direction:column;gap:4px;padding:8px 10px;border-radius:12px;
-  font-size:12.5px;font-weight:600;line-height:1.4;overflow-wrap:anywhere;
+  font-size:11.5px;font-weight:600;line-height:1.4;overflow-wrap:anywhere;word-break:break-word;
   background:color-mix(in srgb,var(--accent) 12%,transparent);border:1px solid color-mix(in srgb,var(--accent) 28%,transparent)}
 body.btx-legacy #bodyarea .btx-pi-extra div,body.btx-legacy #bodyarea .btx-pi-extra span{color:var(--text)}
 body.btx-legacy #bodyarea .btx-pi-extra a{font-weight:700}
@@ -815,8 +878,8 @@ body.btx-legacy #bodyarea .btx-pcell:not(.btx-rebuilt) img.avatar{max-width:100%
   body.btx-legacy #bodyarea .btx-pi-stats{grid-area:st;justify-content:flex-start;margin-top:10px;gap:4px;width:100%}
   body.btx-legacy #bodyarea .btx-pi-stat{font-size:11px;padding:2px 8px}
   body.btx-legacy #bodyarea .btx-pi-stats.many .btx-pi-stat{font-size:10px;padding:1px 6px}
-  body.btx-legacy #bodyarea .btx-pi-extra{grid-area:ex;margin-top:8px;font-size:12px}
-  body.btx-legacy #bodyarea .btx-pi-extra.many{font-size:11px;padding:6px 8px}
+  body.btx-legacy #bodyarea .btx-pi-extra{grid-area:ex;margin-top:8px;font-size:11px}
+  body.btx-legacy #bodyarea .btx-pi-extra.many{font-size:10.5px;padding:6px 8px}
   body.btx-legacy #bodyarea .btx-pi-acts{grid-area:ac;justify-content:flex-start;margin-top:8px}
   body.btx-legacy #bodyarea .btx-pi-extra{background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
 }
@@ -917,9 +980,18 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
     desc: store.get('desc', true),
     sig: store.get('sig', true),
     pinfo: store.get('pinfo', true),
+    bitlist: store.get('bitlist', true),
     blinline: store.get('blinline', true)
   };
   const collapsed = store.get('collapsed', {});
+
+  // Menu Tampermonkey: BitList on / off
+  if (typeof GM_registerMenuCommand === 'function') {
+    GM_registerMenuCommand(L('blMenu') + (prefs.bitlist ? 'ON' : 'OFF'), () => {
+      store.set('bitlist', !prefs.bitlist);
+      location.reload();
+    });
+  }
 
   function resolvedTheme() {
     if (prefs.theme === 'auto') return mq && mq.matches ? 'dark' : 'light';
@@ -929,8 +1001,10 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
     const root = document.documentElement;
     root.setAttribute('data-theme', resolvedTheme());
     root.setAttribute('data-accent', prefs.accent);
-    document.body.classList.toggle('btx-compact', !!prefs.compact);
-    document.body.classList.toggle('btx-nodesc', !prefs.desc);
+    if (document.body) {
+      document.body.classList.toggle('btx-compact', !!prefs.compact);
+      document.body.classList.toggle('btx-nodesc', !prefs.desc);
+    }
     const m = document.querySelector('meta[name="theme-color"]');
     if (m) m.setAttribute('content', resolvedTheme() === 'dark' ? '#12131a' : (prefs.accent === 'white' ? '#f4f3fa' : '#E5E5E8'));
     const tb = document.getElementById('btx-theme-btn');
@@ -994,6 +1068,7 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
       h('div', { class: 'btx-row' }, h('span', { class: 'lbl' }, L('accent')), swatches),
       h('div', { class: 'btx-row' }, toggle(L('showDesc'), 'desc')),
       h('div', { class: 'btx-row' }, toggle(L('compact'), 'compact')),
+      h('div', { class: 'btx-row' }, toggle(L('blEnable'), 'bitlist', true)),
       h('div', { class: 'btx-row' }, toggle(L('blInline'), 'blinline')),
       h('div', { class: 'btx-row' }, toggle(L('sigOriginal'), 'sig', true)),
       h('div', { class: 'btx-row' }, toggle(L('pinfoRebuild'), 'pinfo', true)),
@@ -1126,9 +1201,17 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
 
   function upgradePagers() {
     document.querySelectorAll('#bodyarea td.middletext').forEach((td) => {
-      if (!td.querySelector('a.navPages') || !/^\s*Pages:/.test(td.textContent)) return;
+      if (td.classList.contains('btx-pgcell') || !/^\s*Pages:/.test(td.textContent)) return;
       const keep = [...td.querySelectorAll('a')].filter((a) => !a.classList.contains('navPages')).map((a) => a.cloneNode(true));
-      const pg = buildPager(parsePager(td), true);
+      let pg;
+      if (td.querySelector('a.navPages')) {
+        pg = buildPager(parsePager(td), true);
+      } else {
+        // Thread / halaman dengan 1 halaman saja: tampilkan satu tombol halaman supaya bar tetap rapi
+        const m = txt(td).match(/\[\s*(\d+)\s*\]/);
+        pg = h('nav', { class: 'btx-pager btx-pager2', 'aria-label': L('pages') },
+          h('span', { class: 'pg on', 'aria-current': 'page' }, m ? m[1] : '1'));
+      }
       if (!pg) return;
       keep.forEach((a) => { a.classList.add('pg'); pg.append(a); });
       td.classList.add('btx-pgcell');
@@ -1293,64 +1376,130 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
   }
 
   /* ------------------------------------------------------------------ *
-   *  Signature: diisolasi (Shadow DOM) agar format aslinya tidak berubah
+   *  Signature
+   *  - Browser modern (Shadow DOM + constructable stylesheet): diisolasi agar format
+   *    aslinya tidak berubah, lalu diperkecil seragam bila lebih lebar dari kartu.
+   *  - Browser / WebView lawas: JANGAN diisolasi. Signature dibiarkan di tempat aslinya
+   *    (kelas btx-sigplain, hanya dibatasi lebarnya) sehingga PASTI tetap muncul.
    * ------------------------------------------------------------------ */
+  const canShadowIsolate = () => {
+    try {
+      return !!(Element.prototype.attachShadow &&
+        'adoptedStyleSheets' in Document.prototype &&
+        typeof CSSStyleSheet === 'function' &&
+        CSSStyleSheet.prototype && typeof CSSStyleSheet.prototype.replaceSync === 'function' &&
+        document.getRootNode);
+    } catch (e) { return false; }
+  };
+
   let siteCss = null;
   function siteStyles() {
     if (siteCss) return siteCss;
-    siteCss = { sheets: null, nodes: [] };
     try {
-      if ('adoptedStyleSheets' in Document.prototype && typeof CSSStyleSheet === 'function') {
-        let css = '';
-        [...document.styleSheets].forEach((ss) => {
-          if (ss.ownerNode && ss.ownerNode.id === 'btx-style') return;
-          css += [...ss.cssRules].map((r) => r.cssText).join('\n') + '\n';
-        });
-        const sheet = new CSSStyleSheet();
-        sheet.replaceSync(css);
-        siteCss.sheets = [sheet];
-        return siteCss;
-      }
-    } catch (e) { siteCss.sheets = null; }
-    siteCss.nodes = [...document.querySelectorAll('link[rel~="stylesheet"], style')].filter((n) => n.id !== 'btx-style');
+      let css = '';
+      [...document.styleSheets].forEach((ss) => {
+        if (ss.ownerNode && (ss.ownerNode.id === 'btx-style' || ss.ownerNode.id === BOOT_ID)) return;
+        try { css += [...ss.cssRules].map((r) => r.cssText).join('\n') + '\n'; } catch (e) { /* stylesheet lintas-origin */ }
+      });
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(css);
+      siteCss = { sheets: [sheet] };
+    } catch (e) { siteCss = { sheets: null }; }
     return siteCss;
   }
 
-  // Signature yang lebih lebar dari kartu DIPERKECIL (zoom) agar utuh, formatnya tidak diubah.
-  // Berlaku di desktop dan mobile.
+  // Signature yang lebih lebar dari kartu: dirender dulu pada lebar aslinya (layout sama seperti di desktop),
+  // lalu DIPERKECIL seragam dengan transform: scale(). Tidak memakai CSS zoom karena zoom di dalam
+  // Shadow DOM sering menggeser layout / merusak tampilan di WebView ponsel.
   const SIG_MOBILE = window.matchMedia ? window.matchMedia('(max-width:759px)') : null;
-  const SIG_ZOOM = !!(window.CSS && window.CSS.supports && window.CSS.supports('zoom', '0.5')); // 'CSS' lokal = string gaya, jadi pakai window.CSS
   const sigList = [];
-  function fitSignature(entry) {
-    const { host, root } = entry;
-    const t = root.querySelector('table');
-    if (!t) return;
-    t.style.zoom = ''; t.style.transform = ''; t.style.transformOrigin = ''; t.style.width = '';
-    host.style.height = ''; host.style.overflow = '';
+  const sigHasContent = (sig) => !!(sig.textContent.trim() || sig.querySelector('img'));
+
+  const SIG_REF_MAX = 900; // lebar maksimum "desain asli" signature yang masih dianggap wajar
+  // Signature yang tata letaknya dibuat dengan spasi (&nbsp;), karakter blok/garis, gambar atau tabel
+  const sigLayoutLike = (sig) => !!sig.querySelector('img, table') || /\u00a0{2}|[\u2500-\u259F]/.test(sig.textContent);
+  const sigKey = (stage) => stage.offsetWidth + 'x' + stage.offsetHeight;
+
+  function fitSignatureCore(entry) {
+    const { host, stage, sig } = entry;
+    if (!host.isConnected) return;
+    stage.style.transform = ''; stage.style.width = ''; stage.style.whiteSpace = ''; stage.style.transformOrigin = '0 0';
+    host.style.height = ''; host.style.overflow = 'hidden';
     const cs = getComputedStyle(host);
     const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
     const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
     const avail = host.clientWidth - padX;
-    const natural = Math.max(t.offsetWidth, t.scrollWidth);
-    if (avail <= 0 || natural <= avail + 1) return;
-    const raw = avail / natural;
-    const s = Math.max(0.3, raw);
-    // sudah muat setelah diperkecil -> sembunyikan scrollbar; kalau masih lebih lebar (batas 30%) tetap bisa digeser
-    host.style.overflow = raw >= 0.3 ? 'hidden' : 'auto';
-    if (SIG_ZOOM) {
-      t.style.zoom = s.toFixed(3);
+    if (avail <= 0) return;
+    const wide = () => Math.max(stage.scrollWidth, stage.offsetWidth);
+
+    // Lebar "asli" tanpa pembungkusan baris (seperti tampil di desktop)
+    stage.style.whiteSpace = 'nowrap';
+    const nW = wide();
+    stage.style.whiteSpace = '';
+
+    let layoutW = 0;
+    if (nW > avail + 1 && nW <= SIG_REF_MAX && sigLayoutLike(sig)) {
+      layoutW = Math.ceil(nW) + 2; // render pada lebar aslinya, jangan dibungkus per baris
     } else {
-      // cadangan untuk browser tanpa CSS zoom: skala via transform, tinggi dihitung dari isi sebenarnya
-      t.style.width = natural + 'px';
-      t.style.transformOrigin = '0 0';
-      t.style.transform = 'scale(' + s.toFixed(3) + ')';
-      host.style.height = Math.ceil(t.getBoundingClientRect().height + padY) + 'px';
+      const w = wide(); // signature teks biasa: biarkan membungkus, hanya perkecil jika ada yang meluap (gambar lebar)
+      if (w > avail + 1) layoutW = Math.ceil(w);
     }
+    if (!layoutW) { entry.last = sigKey(stage); return; } // sudah muat apa adanya
+
+    stage.style.width = layoutW + 'px';
+    const again = wide();
+    if (again > layoutW + 1) { layoutW = Math.ceil(again); stage.style.width = layoutW + 'px'; }
+
+    const raw = avail / layoutW;
+    const s = Math.max(0.3, raw);
+    stage.style.transform = 'scale(' + s.toFixed(4) + ')';
+    host.style.height = Math.ceil(stage.offsetHeight * s + padY) + 'px';
+    // sudah muat setelah diperkecil -> tanpa scrollbar; kalau masih lebih lebar (batas 30%) tetap bisa digeser
+    host.style.overflowX = raw >= 0.3 ? 'hidden' : 'auto';
+    host.style.overflowY = 'hidden';
+    entry.last = sigKey(stage);
+  }
+
+  // Kembalikan signature asli ke tempatnya (host dibuang) dan beri mode sederhana agar pasti terlihat
+  function restoreSignature(entry) {
+    try {
+      if (entry.host.parentNode) {
+        entry.host.parentNode.insertBefore(entry.sig, entry.host);
+        entry.host.parentNode.removeChild(entry.host);
+      }
+      entry.sig.classList.add('btx-sigplain');
+    } catch (e) { /* abaikan */ }
+    const i = sigList.indexOf(entry);
+    if (i > -1) sigList.splice(i, 1);
+  }
+  function fitSignature(entry) {
+    try { fitSignatureCore(entry); } catch (e) { restoreSignature(entry); }
+  }
+  // Signature dianggap "hilang" bila kotaknya berukuran 0 atau terpotong (isi jauh lebih tinggi dari kotak)
+  function sigVisible(en) {
+    if (!en.host.isConnected || !sigHasContent(en.sig)) return true;
+    const hr = en.host.getBoundingClientRect();
+    if (hr.width < 2 || hr.height < 2) return false;
+    const sr = en.stage.getBoundingClientRect();
+    return !(sr.height > 8 && hr.height < sr.height * 0.6);
+  }
+  function verifySignatures() {
+    sigList.slice().forEach((en) => {
+      if (sigVisible(en)) return;
+      fitSignature(en);                       // coba ukur ulang sekali
+      if (!sigVisible(en)) restoreSignature(en); // masih gagal -> tampilkan signature asli
+    });
+  }
+
+  function plainSignatures() {
+    document.querySelectorAll('#bodyarea div.signature').forEach((sig) => sig.classList.add('btx-sigplain'));
   }
 
   function isolateSignatures() {
-    if (!prefs.sig || !Element.prototype.attachShadow) return;
+    if (!prefs.sig) return;
+    if (!canShadowIsolate()) { plainSignatures(); return; } // ponsel lawas: signature tampil apa adanya
     const css = siteStyles();
+    if (!css.sheets) { plainSignatures(); return; }
     document.querySelectorAll('#bodyarea div.signature').forEach((sig) => {
       try {
         if (sig.getRootNode() !== document) return;
@@ -1358,15 +1507,16 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
         const tdClass = (td ? td.className : 'smalltext').replace(/\bwindowbg\d?\b/g, '').trim() || 'smalltext';
         const host = document.createElement('div');
         host.className = 'btx-sighost';
-        host.style.cssText = 'all:initial;display:block;box-sizing:border-box;width:100%;max-width:100%;contain:inline-size;overflow-x:auto;' +
+        host.style.cssText = 'all:initial;display:block;position:relative;box-sizing:border-box;width:100%;max-width:100%;min-width:0;contain:inline-size;overflow:hidden;' +
           'background:var(--btx-sigbg);padding:var(--btx-sigpad);border-radius:12px;color-scheme:light;';
         sig.parentNode.insertBefore(host, sig);
         const root = host.attachShadow({ mode: 'open' });
-        if (css.sheets) root.adoptedStyleSheets = css.sheets;
-        else css.nodes.forEach((n) => root.append(n.cloneNode(true)));
-        root.append(h('table', { width: '100%', cellspacing: '0', cellpadding: '0', border: '0' },
-          h('tbody', {}, h('tr', {}, h('td', { class: tdClass, style: 'background:transparent' }, sig)))));
-        const entry = { host, root };
+        root.adoptedStyleSheets = css.sheets;
+        const stage = h('div', { style: 'display:block;margin:0;padding:0;transform-origin:0 0;' },
+          h('table', { width: '100%', cellspacing: '0', cellpadding: '0', border: '0' },
+            h('tbody', {}, h('tr', {}, h('td', { class: tdClass, style: 'background:transparent' }, sig)))));
+        root.append(stage);
+        const entry = { host, root, stage, sig };
         sigList.push(entry);
         root.addEventListener('load', () => fitSignature(entry), true); // gambar signature selesai dimuat
       } catch (e) { /* biarkan signature asli bila gagal */ }
@@ -1383,8 +1533,94 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
     let timer = null;
     const refit = () => { clearTimeout(timer); timer = setTimeout(() => sigList.forEach(fitSignature), 120); };
     window.addEventListener('resize', refit);
-    window.addEventListener('load', refit);
+    window.addEventListener('load', () => { refit(); setTimeout(verifySignatures, 900); });
     if (SIG_MOBILE && SIG_MOBILE.addEventListener) SIG_MOBILE.addEventListener('change', refit);
+    // ukur ulang beberapa kali untuk koneksi/ponsel lambat (gambar telat dimuat)
+    [400, 1500, 3500].forEach((ms) => setTimeout(() => { sigList.forEach(fitSignature); verifySignatures(); }, ms));
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { refit(); setTimeout(verifySignatures, 300); });
+    // isi signature berubah ukuran (font/gambar telat dimuat) -> ukur ulang; berhenti setelah 6 detik
+    let ticks = 0;
+    const poll = setInterval(() => {
+      sigList.forEach((en) => { if (en.last !== sigKey(en.stage)) fitSignature(en); });
+      if (++ticks >= 12) clearInterval(poll);
+    }, 500);
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Teks glow di isi post, mis. [glow][color=transparent]......[/color] JUDUL [color=transparent]......[/color][/glow]
+   *  Titik transparan sengaja dipakai sebagai "lebar" batang. Di layar sempit ia terbungkus jadi 2 baris,
+   *  jadi titiknya dirapatkan (letter-spacing negatif) agar tetap satu baris seperti di desktop.
+   * ------------------------------------------------------------------ */
+  const glowList = [];
+  const GLOW_SEL = '[style*="shadow" i], [style*="glow" i]';
+  const isClear = (e) => {
+    const c = getComputedStyle(e).color;
+    return c === 'transparent' || /^rgba\(\s*\d+,\s*\d+,\s*\d+,\s*0\s*\)$/.test(c);
+  };
+  const clearFillers = (t) => [t, ...t.querySelectorAll('*')].filter((e) =>
+    isClear(e) && e.textContent.length > 0 && !(e.parentElement && t.contains(e.parentElement) && isClear(e.parentElement)));
+
+  function fitGlow(en) {
+    const { box, inner, fillers } = en;
+    if (!box.isConnected) return;
+    fillers.forEach((f) => { f.style.letterSpacing = ''; });
+    inner.style.transform = ''; box.style.height = ''; box.style.overflow = '';
+    const avail = box.clientWidth;
+    if (avail <= 0) return;
+    let w = inner.offsetWidth;
+    if (w <= avail + 1) return;
+    const chars = fillers.reduce((n, f) => n + f.textContent.length, 0);
+    if (chars > 0) {
+      const fw = fillers.reduce((n, f) => n + f.getBoundingClientRect().width, 0);
+      const ls = Math.min((w - avail) / chars, (fw / chars) * 0.92);
+      if (ls > 0) fillers.forEach((f) => { f.style.letterSpacing = (-ls).toFixed(2) + 'px'; });
+      w = inner.offsetWidth;
+    }
+    if (w > avail + 1) { // masih lebih lebar -> perkecil seragam
+      const s = Math.max(0.3, avail / w);
+      inner.style.transform = 'scale(' + s.toFixed(4) + ')';
+      box.style.height = Math.ceil(inner.offsetHeight * s) + 'px';
+      box.style.overflow = 'hidden';
+    }
+  }
+
+  function setupGlows() {
+    try {
+      const found = new Set();
+      document.querySelectorAll('#bodyarea .post').forEach((post) => {
+        post.querySelectorAll(GLOW_SEL).forEach((el) => found.add(el));
+        post.querySelectorAll('[style*="transparent" i]').forEach((el) => {
+          if (el.textContent.length < 10) return;
+          const g = el.closest(GLOW_SEL);
+          if (g && post.contains(g)) found.add(g);
+          else if (el.parentElement && el.parentElement !== post && el.parentElement.textContent.length < 400) found.add(el.parentElement);
+        });
+      });
+      const all = [...found];
+      const targets = all.filter((t) => !all.some((o) => o !== t && o.contains(t)) && !t.closest('.btx-glowbox'));
+      targets.forEach((t) => {
+        const fillers = clearFillers(t);
+        if (fillers.reduce((n, f) => n + f.textContent.length, 0) < 10) return; // bukan pola glow berisi titik transparan
+        const box = document.createElement('span');
+        box.className = 'btx-glowbox';
+        box.style.cssText = 'display:inline-block;max-width:100%;vertical-align:top;';
+        const inner = document.createElement('span');
+        inner.style.cssText = 'display:inline-block;white-space:nowrap;vertical-align:top;transform-origin:0 0;';
+        t.parentNode.insertBefore(box, t);
+        inner.append(t);
+        box.append(inner);
+        glowList.push({ box, inner, fillers });
+      });
+    } catch (e) { /* biarkan tampilan asli bila gagal */ }
+    if (!glowList.length) return;
+    const refit = () => glowList.forEach((en) => { try { fitGlow(en); } catch (e) { /* abaikan */ } });
+    refit();
+    let timer = null;
+    const later = () => { clearTimeout(timer); timer = setTimeout(refit, 120); };
+    window.addEventListener('resize', later);
+    window.addEventListener('load', later);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(later);
+    [300, 1200, 3000].forEach((ms) => setTimeout(refit, ms));
   }
 
   function footer(extra) {
@@ -1532,6 +1768,7 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
   }
 
   function blForm() {
+    if (!prefs.bitlist) return null; // BitList dimatikan di pengaturan
     const input = h('input', { type: 'search', placeholder: L('blSearch'), 'aria-label': L('blSearch'), enterkeyhint: 'search', autocomplete: 'off' });
     return h('form', { class: 'btx-field', onsubmit: (e) => { e.preventDefault(); blSearch(input.value, 1); } },
       icon('search'), input, h('button', { class: 'btx-go', type: 'submit' }, 'BitList'));
@@ -1779,14 +2016,29 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
       const navTd = [...document.querySelectorAll('td.maintab_back, td.maintab_active_back')].find((td) => !td.closest('#bodyarea'));
       if (navTd && navTd.closest('table')) navTd.closest('table').classList.add('btx-hide');
       document.body.prepend(buildShell(head, sheet));
-      upgradePagers();
-      restylePosts();
-      isolateSignatures();
+      // tiap langkah dibungkus sendiri: kalau satu gagal di ponsel lawas, yang lain tetap jalan
+      safe(upgradePagers);
+      safe(restylePosts);
+      safe(isolateSignatures);
+      safe(setupGlows);
     }
 
     applyPrefs();
-    centerPagers();
+    safe(centerPagers);
   }
 
-  init();
+  function start() {
+    try {
+      init();
+    } catch (e) {
+      if (window.console) console.error('[btx] init gagal, memakai tampilan asli:', e);
+    } finally {
+      // tampilkan halaman SETELAH UI modern selesai dibangun (atau langsung bila gagal)
+      unboot();
+    }
+  }
+
+  // Script jalan di document-start: tunggu DOM selesai di-parse sebelum membangun UI
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
 })();
