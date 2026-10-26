@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bitcointalk Modern UI (Mobile Friendly)
 // @namespace    https://bitcointalk.org/
-// @version      1.5.2
+// @version      1.5.3
 // @description  Modern, mobile-friendly Bitcointalk UI: index, boards, neat thread posts (uncropped avatars), a light/dark skin for every other page, and BitList archive search shown right on the page. Language: auto / English / Indonesia.
 // @author       Gak Jahat
 // @match        https://bitcointalk.org/*
