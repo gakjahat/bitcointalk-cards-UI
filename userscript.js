@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bitcointalk Modern UI (Mobile Friendly)
 // @namespace    https://bitcointalk.org/
-// @version      1.5.3
+// @version      1.5.4
 // @description  Modern, mobile-friendly Bitcointalk UI: index, boards, neat thread posts (uncropped avatars), a light/dark skin for every other page, and BitList archive search shown right on the page. Language: auto / English / Indonesia.
 // @author       Gak Jahat
 // @match        https://bitcointalk.org/*
@@ -90,6 +90,9 @@
       blInline: 'Show BitList results on this page (off = new tab)', blLoading: 'Loading\u2026',
       blFail: 'Could not load BitList results here. Use the button above to open BitList.',
       blNone: 'No results.', blDeleted: 'Deleted', blOf: 'of', blResults: 'results',
+      srcForum: 'Forum', srcBoard: 'This board', srcBitlist: 'BitList',
+        fontSize: 'Font size', fontFamily: 'Font', fontDefault: 'Default', fontSans: 'Sans', fontSerif: 'Serif', fontMono: 'Mono',
+      fontTitle: 'Font', fontTarget: 'Apply font to', fxAll: 'All', fxUi: 'Menu & buttons', fxContent: 'Thread content', fxCard: 'Board cards',
       actMap: {}, sortMap: {}
     },
     id: {
@@ -116,6 +119,9 @@
       blInline: 'Tampilkan hasil BitList di halaman ini (mati = tab baru)', blLoading: 'Memuat\u2026',
       blFail: 'Hasil BitList tidak bisa dimuat di sini. Pakai tombol di atas untuk membuka BitList.',
       blNone: 'Tidak ada hasil.', blDeleted: 'Dihapus', blOf: 'dari', blResults: 'hasil',
+      srcForum: 'Forum', srcBoard: 'Board ini', srcBitlist: 'BitList',
+        fontSize: 'Ukuran font', fontFamily: 'Jenis font', fontDefault: 'Bawaan', fontSans: 'Sans', fontSerif: 'Serif', fontMono: 'Mono',
+      fontTitle: 'Font', fontTarget: 'Terapkan font ke', fxAll: 'Semua', fxUi: 'Menu & tombol', fxContent: 'Isi thread', fxCard: 'Kartu board',
       actMap: { 'New Topic': 'Topik baru', 'Post new poll': 'Polling baru', 'Mark Read': 'Tandai dibaca', 'Notify': 'Notifikasi' },
       sortMap: { 'Subject': 'Judul', 'Started by': 'Pembuat', 'Replies': 'Balasan', 'Views': 'Dilihat', 'Last post': 'Terakhir' }
     }
@@ -141,6 +147,8 @@
    *  Anti-flash: script jalan di document-start, jadi halaman asli
    *  langsung disembunyikan sampai UI modern selesai dibangun.
    *  Ada pengaman: otomatis ditampilkan lagi bila terjadi error / terlalu lama.
+   *  Viewport meta juga dipasang SEKARANG (bukan nanti) supaya halaman tidak
+   *  "zoom sendiri" setiap refresh.
    * ------------------------------------------------------------------ */
   const BOOT_ID = 'btx-boot-style';
   safe(() => {
@@ -150,9 +158,17 @@
     const bg = dark ? '#12131a' : (acc === 'white' ? '#f4f3fa' : '#E5E5E8');
     const st = document.createElement('style');
     st.id = BOOT_ID;
-    st.textContent = 'html.btx-boot{visibility:hidden !important;background:' + bg + ' !important}';
+    st.textContent = 'html.btx-boot{background:' + bg + ' !important}' +  'html.btx-boot body{opacity:0 !important}';
     (document.head || document.documentElement).appendChild(st);
     document.documentElement.classList.add('btx-boot');
+  });
+  safe(() => {
+    if (!document.querySelector('meta[name="viewport"]')) {
+      const m = document.createElement('meta');
+      m.name = 'viewport';
+      m.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
+      (document.head || document.documentElement).appendChild(m);
+    }
   });
   function unboot() {
     safe(() => {
@@ -192,7 +208,10 @@
     gear: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
     search: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
     chev: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
-    close: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>'
+    close: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+    lang: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
+    font: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 19 9 5l6 14M5.5 14h7M15 19l3.5-8 2.5 8M16.2 16.5h4.6"/></svg>',
+    palette: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 2-.9 2-2 0-.6-.3-1-.6-1.4-.3-.4-.4-.8-.4-1.2 0-1 .8-1.9 1.9-1.9H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7" r="1"/></svg>'
   };
   const icon = (name, cls) => h('span', { class: 'btx-ico ' + (cls || ''), html: ICON[name] });
 
@@ -510,6 +529,11 @@ body.btx-full > *:not(#btx-app){display:none !important}
 .btx-iconbtn{width:40px;height:40px;border-radius:12px;border:1px solid var(--border);background:var(--surface);
   display:grid;place-items:center;color:var(--text)}
 .btx-iconbtn:active{transform:scale(.95)}
+@media(max-width:520px){
+  .btx-top{gap:6px}
+  .btx-top .btx-iconbtn{width:36px;height:36px;border-radius:10px;flex:none}
+  .btx-brand{gap:8px;font-size:16px;min-width:0;overflow:hidden;white-space:nowrap}
+}
 
 .btx-wrap{max-width:1180px;min-width:0;margin:0 auto;padding:16px max(14px,env(safe-area-inset-left)) 40px max(14px,env(safe-area-inset-right))}
 .btx-shellwrap{padding-bottom:0}
@@ -524,7 +548,7 @@ body.btx-full > *:not(#btx-app){display:none !important}
 /* shell (halaman non-index/board): nav di kiri, search di kanan; mobile ditumpuk */
 .btx-shellbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-top:12px}
 .btx-shellbar .btx-nav{margin:0;padding:0;flex:1 1 auto;min-width:0}
-.btx-shellsearch{flex:0 1 340px;min-width:240px;margin-left:auto;display:grid;gap:8px}
+.btx-shellsearch{flex:0 1 380px;min-width:240px;margin-left:auto;display:grid;gap:8px}
 .btx-shellsearch .btx-field{height:42px}
 @media(max-width:699px){
   .btx-shellbar{flex-direction:column;align-items:stretch;gap:10px}
@@ -548,9 +572,9 @@ div.btx-avatar{display:grid;place-items:center;width:64px;height:64px;font-weigh
 }
 .btx-hello{font-size:18px;font-weight:700;letter-spacing:-.01em;margin:0}
 .btx-sub{color:var(--muted);font-size:13px;margin:2px 0 0}
-.btx-quick{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.btx-quick{display:flex;flex-wrap:wrap;gap:10px 12px;margin-top:14px}
 .btx-quick.slim{margin-top:10px}
-.btx-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;font-size:13px;font-weight:600;
+.btx-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;font-size:13px;font-weight:600;
   background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent) !important;border:0}
 .btx-chip.ghost{background:var(--surface2);color:var(--text) !important;font-weight:500}
 .btx-chip:active{transform:scale(.97)}
@@ -574,6 +598,12 @@ div.btx-avatar{display:grid;place-items:center;width:64px;height:64px;font-weigh
 .btx-field input{flex:1;min-width:0;border:0;background:transparent;color:var(--text);font:inherit;font-size:16px;outline:0;height:100%}
 .btx-field input::placeholder{color:var(--muted)}
 .btx-go{border:0;background:var(--accent);color:var(--on-accent) !important;border-radius:10px;height:34px;padding:0 14px;font-weight:600;font-size:14px}
+/* dropdown pilihan sumber pencarian (Forum / BitList) - hanya di halaman thread & halaman lain */
+.btx-sel{flex:none;height:34px;max-width:112px;border:0;border-radius:10px;background:var(--surface2);color:var(--text);
+  font:inherit;font-size:13px;font-weight:600;padding:0 6px;cursor:pointer;outline:0;text-overflow:ellipsis}
+.btx-sel:focus-visible{outline:2px solid var(--accent)}
+.btx-field.btx-multi{gap:8px}
+@media(max-width:760px){.btx-sel{font-size:16px}}
 
 /* categories */
 .btx-cat{margin-top:22px;min-width:0}
@@ -640,7 +670,7 @@ body.btx-nodesc .btx-b-desc{display:none}
 .btx-bhead{margin-top:6px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:16px}
 .btx-bhead h1{margin:0;font-size:22px;letter-spacing:-.02em;line-height:1.25;overflow-wrap:anywhere}
 .btx-bmod{margin:4px 0 0;color:var(--muted);font-size:13px}
-.btx-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.btx-acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
 .btx-btn{display:inline-flex;align-items:center;padding:9px 16px;border-radius:12px;font-weight:600;font-size:14px;
   background:var(--surface2);color:var(--text) !important;border:0}
 .btx-btn.primary{background:var(--accent);color:var(--on-accent) !important}
@@ -899,7 +929,7 @@ body.btx-legacy #bodyarea .btx-pgbar div.nav{display:flex;flex-wrap:wrap;justify
 body.btx-legacy #bodyarea .btx-pgbar td table{margin-left:auto}
 
 /* bar paginasi + tombol aksi di halaman thread: kecil, sejajar, mudah dibaca */
-body.btx-legacy #bodyarea .btx-pgbar .btx-pager{gap:4px;padding:0;margin:0;align-items:center}
+body.btx-legacy #bodyarea .btx-pgbar .btx-pager{gap:6px;padding:0;margin:0;align-items:center}
 body.btx-legacy #bodyarea .btx-pgbar .btx-pager .pg{min-width:28px;height:28px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:700;line-height:1;
   background:var(--surface);color:var(--text) !important;border:1px solid color-mix(in srgb,var(--accent) 28%,var(--border));
   display:inline-flex;align-items:center;justify-content:center;text-decoration:none;transition:background .15s,color .15s}
@@ -914,8 +944,8 @@ body.btx-legacy #bodyarea .btx-pgbar .btx-jump input{width:64px;height:28px;padd
 body.btx-legacy #bodyarea .btx-pgbar .btx-jump button{height:28px;padding:0 12px;border-radius:999px;font-size:12px}
 body.btx-legacy #bodyarea .btx-pgbar td table{border-collapse:separate;border-spacing:0}
 body.btx-legacy #bodyarea .btx-pgbar td table > tbody{display:block}
-body.btx-legacy #bodyarea .btx-pgbar td table > tbody > tr{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px}
-body.btx-legacy #bodyarea .btx-pgbar td table td.mirrortab_back,body.btx-legacy #bodyarea .btx-pgbar td table td.maintab_back{display:block;width:auto !important;padding:0 !important}
+body.btx-legacy #bodyarea .btx-pgbar td table > tbody > tr{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px 10px}
+body.btx-legacy #bodyarea .btx-pgbar td table td.mirrortab_back,body.btx-legacy #bodyarea .btx-pgbar td table td.maintab_back{display:flex;flex-wrap:wrap;gap:8px 10px;width:auto !important;padding:0 !important}
 body.btx-legacy #bodyarea .btx-pgbar .mirrortab_back a,body.btx-legacy #bodyarea .btx-pgbar .maintab_back a{display:inline-flex;align-items:center;height:28px;padding:0 13px;margin:0;
   border-radius:999px;font-size:12px;font-weight:700;line-height:1;letter-spacing:.01em;text-decoration:none;box-sizing:border-box;
   color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);
@@ -933,6 +963,19 @@ body.btx-legacy #bodyarea td.msgcl1{padding:0 0 12px !important;background:trans
 body.btx-legacy #bodyarea td.msgcl1 > table{border-collapse:separate;border-spacing:0}
 body.btx-legacy #bodyarea td.msgcl1 > table > tbody > tr > td{border:1px solid var(--border);border-radius:16px;
   background:var(--surface);box-shadow:var(--shadow)}
+
+/* header thread (Author / Topic) menyatu dengan kartu post pertama, seperti kartu "Various links" */
+body.btx-legacy #bodyarea table.btx-thead{width:100% !important;border-collapse:separate !important;border-spacing:0;
+  border:1px solid var(--accent) !important;border-bottom:0 !important;border-radius:16px 16px 0 0 !important;
+  overflow:hidden;box-shadow:none !important;margin:0 !important;background:var(--accent)}
+body.btx-legacy #bodyarea table.btx-thead tr,
+body.btx-legacy #bodyarea table.btx-thead td{background:var(--accent) !important;background-image:none !important;
+  color:var(--on-accent) !important;border-bottom:0}
+body.btx-legacy #bodyarea table.btx-thead td{padding-top:9px;padding-bottom:9px}
+body.btx-legacy #bodyarea #quickModForm > table.bordercolor{margin-top:0}
+body.btx-legacy #bodyarea td.btx-firstpost{padding-top:0 !important}
+body.btx-legacy #bodyarea td.btx-firstpost > table > tbody > tr > td{border-top:0 !important;
+  border-top-left-radius:0 !important;border-top-right-radius:0 !important}
 
 body.btx-legacy #bodyarea .btx-pi-av div{overflow:visible !important;width:auto !important}
 body.btx-legacy #bodyarea .btx-st{display:inline-flex;vertical-align:middle;margin-left:6px}
@@ -968,6 +1011,36 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
   .btx-nav a{padding:7px 12px;font-size:13px}
 }
 
+/* ukuran & jenis font (menu Font) - 3 target terpisah:
+   ui = menu & tombol, ct = isi post thread, cd = kartu board/topik
+   --btx-fs-*  = skala ukuran ; --btx-ff-* = jenis font ; data-fui/fct/fcd = font aktif */
+body.btx{font-size:15px}
+body.btx-legacy{font-size:14px}
+body.btx-legacy #bodyarea{font-size:14px}
+
+/* ukuran: MENU & TOMBOL (panel pengaturan sengaja tidak ikut) */
+.btx-top,.btx-hero,.btx-shellbar,.btx-tools,.btx-crumbs,.btx-sorts,.btx-acts,.btx-wrap > .btx-nav,.btx-wrap > .btx-pager{zoom:var(--btx-fs-ui,1)}
+body.btx-legacy #bodyarea .btx-pgbar{zoom:var(--btx-fs-ui,1);width:calc(100% / var(--btx-fs-ui,1)) !important}
+/* ukuran: ISI POST THREAD */
+body.btx-legacy #bodyarea .post{zoom:var(--btx-fs-ct,1)}
+/* ukuran: KARTU BOARD / TOPIK */
+body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap > .btx-grid,.btx-bhead h1,.btx-bhead .btx-bmod){zoom:var(--btx-fs-cd,1)}
+
+/* font: KARTU BOARD / TOPIK */
+:root[data-fcd="1"] :is(.btx-cat,.btx-grid,.btx-info,.btx-bhead,.btx-topics,.btx-sec-h,.btx-news),
+:root[data-fcd="1"] :is(.btx-cat,.btx-grid,.btx-info,.btx-bhead,.btx-topics,.btx-sec-h,.btx-news) *{font-family:var(--btx-ff-cd) !important}
+
+/* font: ISI POST THREAD */
+:root[data-fct="1"] body.btx-legacy #bodyarea .post,
+:root[data-fct="1"] body.btx-legacy #bodyarea .post *{font-family:var(--btx-ff-ct) !important}
+:root[data-fct="1"] body.btx-legacy #bodyarea .post :is(pre,code,.code,.codeheader),
+:root[data-fct="1"] body.btx-legacy #bodyarea .post :is(pre,code,.code,.codeheader) *{font-family:ui-monospace,Menlo,Consolas,monospace !important}
+
+/* font: MENU & TOMBOL */
+:root[data-fui="1"] :is(.btx-top,.btx-overlay,.btx-nav,.btx-quick,.btx-hero,.btx-shellbar,.btx-crumbs,.btx-sorts,.btx-acts,.btx-field,.btx-pager),
+:root[data-fui="1"] :is(.btx-top,.btx-overlay,.btx-nav,.btx-quick,.btx-hero,.btx-shellbar,.btx-crumbs,.btx-sorts,.btx-acts,.btx-field,.btx-pager) *,
+:root[data-fui="1"] #btx-app :is(button,input,select,textarea){font-family:var(--btx-ff-ui) !important}
+
 @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
 `;
 
@@ -983,7 +1056,14 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
     sig: store.get('sig', true),
     pinfo: store.get('pinfo', true),
     bitlist: store.get('bitlist', true),
-    blinline: store.get('blinline', true)
+    blinline: store.get('blinline', true),
+    fsUi: store.get('fsUi', store.get('fsize', 100)),
+    fsPost: store.get('fsPost', store.get('fsize', 100)),
+    fsCard: store.get('fsCard', store.get('fsize', 100)),
+    ffUi: store.get('ffUi', store.get('ffamily', 'default')),
+    ffPost: store.get('ffPost', store.get('ffamily', 'default')),
+    ffCard: store.get('ffCard', store.get('ffamily', 'default')),
+    fx: ((v) => (['all', 'ui', 'post', 'card'].includes(v) ? v : (v === 'content' ? 'post' : 'all')))(store.get('fx', 'all')) // all | ui | post | card
   };
   const collapsed = store.get('collapsed', {});
 
@@ -999,10 +1079,25 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
     if (prefs.theme === 'auto') return mq && mq.matches ? 'dark' : 'light';
     return prefs.theme;
   }
+    const FONT_STACKS = {
+    sans: '"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif',
+    serif: 'Georgia,"Times New Roman",Times,serif',
+    mono: 'ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace',
+    verdana: 'Verdana,Geneva,Tahoma,sans-serif',
+    trebuchet: '"Trebuchet MS","Lucida Grande","Lucida Sans Unicode",Tahoma,sans-serif',
+    palatino: '"Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif',
+    casual: '"Comic Sans MS","Comic Neue","Chalkboard SE",cursive,sans-serif'
+  };
   function applyPrefs() {
     const root = document.documentElement;
     root.setAttribute('data-theme', resolvedTheme());
     root.setAttribute('data-accent', prefs.accent);
+    [['ui', prefs.fsUi, prefs.ffUi], ['ct', prefs.fsPost, prefs.ffPost], ['cd', prefs.fsCard, prefs.ffCard]].forEach(([k, s, f]) => {
+      root.style.setProperty('--btx-fs-' + k, String((s || 100) / 100));
+      if (FONT_STACKS[f]) root.style.setProperty('--btx-ff-' + k, FONT_STACKS[f]);
+      else root.style.removeProperty('--btx-ff-' + k);
+      root.setAttribute('data-f' + k, FONT_STACKS[f] ? '1' : '0');
+    });
     if (document.body) {
       document.body.classList.toggle('btx-compact', !!prefs.compact);
       document.body.classList.toggle('btx-nodesc', !prefs.desc);
@@ -1012,18 +1107,28 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
     const tb = document.getElementById('btx-theme-btn');
     if (tb) { tb.innerHTML = ''; tb.append(icon(resolvedTheme() === 'dark' ? 'sun' : 'moon')); }
   }
+
   function setPref(k, v) { prefs[k] = v; store.set(k, v); applyPrefs(); }
   if (mq && mq.addEventListener) mq.addEventListener('change', () => { if (prefs.theme === 'auto') applyPrefs(); });
 
   /* ------------------------------------------------------------------ *
    *  Komponen bersama
    * ------------------------------------------------------------------ */
-  function settingsSheet() {
-    const overlay = h('div', { class: 'btx-overlay', id: 'btx-settings', role: 'dialog', 'aria-modal': 'true', 'aria-label': L('settingsTitle') });
+  // Pembuat panel (sheet) umum: dipakai untuk Pengaturan, Bahasa, Font, dan Warna
+  function sheetOf(id, title, rows) {
+    const overlay = h('div', { class: 'btx-overlay', id, role: 'dialog', 'aria-modal': 'true', 'aria-label': title });
     const close = () => overlay.classList.remove('open');
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    overlay.append(h('div', { class: 'btx-sheet' },
+      h('div', { class: 'btx-sheet-h' }, h('h3', {}, title),
+        h('button', { class: 'btx-iconbtn', onclick: close, 'aria-label': L('close') }, icon('close'))),
+      rows
+    ));
+    return { overlay, open: () => overlay.classList.add('open') };
+  }
 
+  function settingsSheet() {
     const seg = h('div', { class: 'btx-seg' });
     [['auto', L('auto')], ['light', L('light')], ['dark', L('dark')]].forEach(([v, label]) => {
       const b = h('button', { class: prefs.theme === v ? 'on' : '', onclick: () => {
@@ -1062,12 +1167,44 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
       } }, label));
     });
 
-    overlay.append(h('div', { class: 'btx-sheet' },
-      h('div', { class: 'btx-sheet-h' }, h('h3', {}, L('settingsTitle')),
-        h('button', { class: 'btx-iconbtn', onclick: close, 'aria-label': L('close') }, icon('close'))),
+    const SUF = { ui: 'Ui', post: 'Post', card: 'Card' };
+    const tgts = () => (prefs.fx === 'all' ? ['ui', 'post', 'card'] : [prefs.fx]);
+    const curFs = () => prefs['fs' + SUF[tgts()[0]]];
+    const curFf = () => prefs['ff' + SUF[tgts()[0]]];
+
+    const fsRange = h('input', { type: 'range', min: '85', max: '250', step: '5', value: String(curFs()), 'aria-label': L('fontSize'),
+      style: 'width:100%;accent-color:var(--accent)' });
+    const fsVal = h('span', {}, curFs() + '%');
+    fsRange.addEventListener('input', () => {
+      fsVal.textContent = fsRange.value + '%';
+      tgts().forEach((t) => setPref('fs' + SUF[t], +fsRange.value));
+    });
+
+    const ffSeg = h('div', { class: 'btx-seg', style: 'grid-template-columns:repeat(4,1fr)' });
+    const markFf = () => ffSeg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x.getAttribute('data-v') === curFf()));
+    [['default', L('fontDefault')], ['sans', L('fontSans')], ['serif', L('fontSerif')], ['mono', L('fontMono')], ['verdana', 'Verdana'], ['trebuchet', 'Trebuchet'], ['palatino', 'Palatino'], ['casual', 'Casual']].forEach(([v, label]) => {
+      ffSeg.append(h('button', { class: curFf() === v ? 'on' : '', 'data-v': v, onclick: () => {
+        tgts().forEach((t) => setPref('ff' + SUF[t], v));
+        markFf();
+      } }, label));
+    });
+
+    // Target: Semua / Menu & tombol / Isi thread / Kartu board
+    const fxSeg = h('div', { class: 'btx-seg', style: 'grid-template-columns:repeat(2,1fr)' });
+    [['all', L('fxAll')], ['ui', L('fxUi')], ['post', L('fxContent')], ['card', L('fxCard')]].forEach(([v, label]) => {
+      const b = h('button', { class: prefs.fx === v ? 'on' : '', onclick: () => {
+        setPref('fx', v);
+        fxSeg.querySelectorAll('button').forEach((x) => x.classList.remove('on'));
+        b.classList.add('on');
+        fsRange.value = String(curFs());
+        fsVal.textContent = curFs() + '%';
+        markFf();
+      } }, label);
+      fxSeg.append(b);
+    });
+
+    const main = sheetOf('btx-settings', L('settingsTitle'), [
       h('div', { class: 'btx-row' }, h('span', { class: 'lbl' }, L('theme')), seg),
-      h('div', { class: 'btx-row' }, h('span', { class: 'lbl' }, L('language')), langSeg),
-      h('div', { class: 'btx-row' }, h('span', { class: 'lbl' }, L('accent')), swatches),
       h('div', { class: 'btx-row' }, toggle(L('showDesc'), 'desc')),
       h('div', { class: 'btx-row' }, toggle(L('compact'), 'compact')),
       h('div', { class: 'btx-row' }, toggle(L('blEnable'), 'bitlist', true)),
@@ -1076,13 +1213,31 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
       h('div', { class: 'btx-row' }, toggle(L('pinfoRebuild'), 'pinfo', true)),
       h('div', { class: 'btx-row' }, h('button', { class: 'btx-link', onclick: () => { store.set('enabled', false); location.reload(); } },
         L('backOrig')))
-    ));
-    return { overlay, open: () => overlay.classList.add('open') };
+    ]);
+    const langS = sheetOf('btx-lang', L('language'), h('div', { class: 'btx-row' }, langSeg));
+    const colorS = sheetOf('btx-color', L('accent'), h('div', { class: 'btx-row' }, swatches));
+    const fontS = sheetOf('btx-font', L('fontTitle'), [
+      h('div', { class: 'btx-row' }, h('span', { class: 'lbl' }, L('fontTarget')), fxSeg),
+      h('div', { class: 'btx-row' }, h('span', { class: 'lbl' }, L('fontSize') + ' ', fsVal), fsRange),
+      h('div', { class: 'btx-row' }, h('span', { class: 'lbl' }, L('fontFamily')), ffSeg)
+    ]);
+
+    return {
+      overlay: main.overlay,
+      open: main.open,
+      openLang: langS.open,
+      openFont: fontS.open,
+      openColor: colorS.open,
+      others: [langS.overlay, fontS.overlay, colorS.overlay]
+    };
   }
 
   function makeTopbar(sheet) {
     return h('header', { class: 'btx-top' },
       h('a', { class: 'btx-brand', href: '/index.php' }, h('span', { class: 'btx-logo' }, '\u20BF'), 'Bitcoin Forum'),
+      h('button', { class: 'btx-iconbtn', 'aria-label': L('language'), title: L('language'), onclick: sheet.openLang }, icon('lang')),
+      h('button', { class: 'btx-iconbtn', 'aria-label': L('fontTitle'), title: L('fontTitle'), onclick: sheet.openFont }, icon('font')),
+      h('button', { class: 'btx-iconbtn', 'aria-label': L('accent'), title: L('accent'), onclick: sheet.openColor }, icon('palette')),
       h('button', { class: 'btx-iconbtn', id: 'btx-theme-btn', 'aria-label': L('toggleTheme'), onclick: () => {
         setPref('theme', resolvedTheme() === 'dark' ? 'light' : 'dark');
         sheet.overlay.querySelectorAll('.btx-seg button').forEach((x, i) => x.classList.toggle('on', ['auto', 'light', 'dark'][i] === prefs.theme));
@@ -1108,6 +1263,37 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
     return h('form', { class: 'btx-field', method: 'post', action: head.searchAction, 'accept-charset': 'ISO-8859-1' },
       icon('search'),
       h('input', { type: 'search', name: 'search', placeholder: scoped ? L('searchBoard') : L('searchForum'), 'aria-label': L('search'), enterkeyhint: 'search' }),
+      head.searchHidden.map((x) => h('input', { type: 'hidden', name: x.name, value: x.value })),
+      h('button', { class: 'btx-go', type: 'submit' }, L('search'))
+    );
+  }
+
+  /* Pencarian gabungan (hanya halaman thread & halaman lain): satu kolom, dropdown memilih Forum asli atau BitList */
+  function searchBox(head) {
+    if (!prefs.bitlist) return searchForm(head); // BitList dimatikan -> pencarian forum biasa
+    const scoped = head.searchHidden.some((x) => /^brd\[/.test(x.name));
+    let mode = store.get('smode', 'forum');
+    if (mode !== 'bitlist') mode = 'forum';
+
+    const input = h('input', { type: 'search', name: 'search', 'aria-label': L('search'), enterkeyhint: 'search', autocomplete: 'off' });
+    const sync = () => {
+      input.placeholder = mode === 'bitlist' ? L('blSearch') : (scoped ? L('searchBoard') : L('searchForum'));
+    };
+    const sel = h('select', { class: 'btx-sel', 'aria-label': L('search'), onchange: () => {
+      mode = sel.value === 'bitlist' ? 'bitlist' : 'forum';
+      store.set('smode', mode);
+      sync();
+    } },
+      h('option', { value: 'forum' }, scoped ? L('srcBoard') : L('srcForum')),
+      h('option', { value: 'bitlist' }, L('srcBitlist')));
+    sel.value = mode;
+    sync();
+
+    return h('form', {
+      class: 'btx-field btx-multi', method: 'post', action: head.searchAction, 'accept-charset': 'ISO-8859-1',
+      onsubmit: (e) => { if (mode === 'bitlist') { e.preventDefault(); blSearch(input.value, 1); } }
+    },
+      icon('search'), sel, input,
       head.searchHidden.map((x) => h('input', { type: 'hidden', name: x.name, value: x.value })),
       h('button', { class: 'btx-go', type: 'submit' }, L('search'))
     );
@@ -1228,6 +1414,19 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
       const on = p.querySelector('.on');
       if (on) p.scrollLeft = on.offsetLeft - p.clientWidth / 2 + on.offsetWidth / 2;
     });
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Halaman thread: header (Author / Topic) disatukan dengan kartu post pertama
+   *  Header asli: <table class="tborder"><tr class="catbg3"> ... <td id="top_subject">
+   * ------------------------------------------------------------------ */
+  function joinThreadHead() {
+    const sub = document.getElementById('top_subject');
+    const tbl = sub && sub.closest('table');
+    if (!tbl) return;
+    tbl.classList.add('btx-thead');
+    const first = document.querySelector('#quickModForm td.msgcl1');
+    if (first) first.classList.add('btx-firstpost');
   }
 
   /* ------------------------------------------------------------------ *
@@ -1946,7 +2145,7 @@ function setupDividers() {
     }
 
     children.push(footer(head.markAll && h('div', {}, h('a', { class: 'btx-markall', href: head.markAll }, L('markAll')))));
-    return h('div', { id: 'btx-app' }, makeTopbar(sheet), h('main', { class: 'btx-wrap' }, children), sheet.overlay);
+    return h('div', { id: 'btx-app' }, makeTopbar(sheet), h('main', { class: 'btx-wrap' }, children), sheet.overlay, sheet.others);
   }
 
   /* ------------------------------------------------------------------ *
@@ -2031,7 +2230,7 @@ function setupDividers() {
     });
 
     children.push(buildPager(bp.pager), footer(null));
-    return h('div', { id: 'btx-app' }, makeTopbar(sheet), h('main', { class: 'btx-wrap' }, children), sheet.overlay);
+    return h('div', { id: 'btx-app' }, makeTopbar(sheet), h('main', { class: 'btx-wrap' }, children), sheet.overlay, sheet.others);
   }
 
   /* ------------------------------------------------------------------ *
@@ -2041,8 +2240,8 @@ function setupDividers() {
     return h('div', { id: 'btx-app' }, makeTopbar(sheet),
       h('div', { class: 'btx-wrap btx-shellwrap' }, heroEl(head, true),
         h('div', { class: 'btx-shellbar' }, navEl(head),
-          h('div', { class: 'btx-shellsearch' }, searchForm(head), blForm()))),
-      sheet.overlay);
+          h('div', { class: 'btx-shellsearch' }, searchBox(head)))),
+      sheet.overlay, sheet.others);
   }
 
   /* ------------------------------------------------------------------ *
@@ -2097,6 +2296,7 @@ function setupDividers() {
       document.body.prepend(buildShell(head, sheet));
       // tiap langkah dibungkus sendiri: kalau satu gagal di ponsel lawas, yang lain tetap jalan
       safe(upgradePagers);
+      safe(joinThreadHead);
       safe(restylePosts);
       safe(isolateSignatures);
       safe(setupGlows);
