@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Bitcointalk Modern UI (Mobile Friendly)
 // @namespace    https://bitcointalk.org/
-// @version      1.5.4
-// @description  Modern, mobile-friendly Bitcointalk UI: index, boards, neat thread posts (uncropped avatars), a light/dark skin for every other page, and BitList archive search shown right on the page. Language: auto / English / Indonesia.
+// @version      1.5.6
+// @description  Modern, mobile-friendly Bitcointalk UI: index, boards, neat thread posts (uncropped avatars, compact poster card on mobile), a light/dark skin for every other page, and BitList archive search shown right on the page. Language: auto / English / Indonesia.
 // @author       Gak Jahat
 // @match        https://bitcointalk.org/*
 // @run-at       document-start
@@ -19,9 +19,6 @@
 (function () {
   'use strict';
 
-  /* ------------------------------------------------------------------ *
-   *  Polyfill kecil untuk browser / WebView ponsel lawas
-   * ------------------------------------------------------------------ */
   try {
     if (!Element.prototype.replaceChildren) {
       Element.prototype.replaceChildren = function () {
@@ -32,8 +29,9 @@
         }
       };
     }
-  } catch (e) { /* abaikan */ }
+  } catch (e) {}
 
+  // Flattens nested arrays into a single array
   const flatten = (arr, out) => {
     out = out || [];
     for (let i = 0; i < arr.length; i++) {
@@ -41,11 +39,10 @@
     }
     return out;
   };
+  // Runs a function and logs any error without stopping the script
   const safe = (fn) => { try { fn(); } catch (e) { if (window.console) console.error('[btx]', e); } };
 
-  /* ------------------------------------------------------------------ *
-   *  Penyimpanan pengaturan
-   * ------------------------------------------------------------------ */
+  // Reads and writes persistent settings
   const store = {
     get(key, def) {
       try {
@@ -58,13 +55,10 @@
       try {
         if (typeof GM_setValue === 'function') GM_setValue('btx_' + key, val);
         else localStorage.setItem('btx_' + key, JSON.stringify(val));
-      } catch (e) { /* abaikan */ }
+      } catch (e) {}
     }
   };
 
-  /* ------------------------------------------------------------------ *
-   *  Bahasa (i18n) - tambah bahasa baru cukup dengan menambah objek di DICT
-   * ------------------------------------------------------------------ */
   const DICT = {
     en: {
       toggleMenu: 'Toggle modern / original UI', today: 'Today at', hasNew: 'New posts',
@@ -85,6 +79,7 @@
       noTopic: 'No matching topics.', emptyBoard: 'No topics in this board yet.',
       sigOriginal: 'Keep signatures in original look',
       pinfoRebuild: 'Rebuild poster info (turn off if another script conflicts)',
+      pabbr: 'Abbreviate poster stats to initials on mobile (tap for full name)',
       blSearch: 'Search BitList archive\u2026', blTitle: 'BitList results', blOpen: 'Open in BitList',
       blEnable: 'Enable BitList search', blMenu: 'BitList search: ',
       blInline: 'Show BitList results on this page (off = new tab)', blLoading: 'Loading\u2026',
@@ -114,6 +109,7 @@
       noTopic: 'Tidak ada topik yang cocok.', emptyBoard: 'Belum ada topik di board ini.',
       sigOriginal: 'Signature tampil seperti aslinya',
       pinfoRebuild: 'Tata ulang info poster (matikan jika bentrok dengan script lain)',
+      pabbr: 'Singkat statistik poster jadi inisial di mobile (tap untuk nama lengkap)',
       blSearch: 'Cari di arsip BitList\u2026', blTitle: 'Hasil BitList', blOpen: 'Buka di BitList',
       blEnable: 'Aktifkan pencarian BitList', blMenu: 'Pencarian BitList: ',
       blInline: 'Tampilkan hasil BitList di halaman ini (mati = tab baru)', blLoading: 'Memuat\u2026',
@@ -126,10 +122,11 @@
       sortMap: { 'Subject': 'Judul', 'Started by': 'Pembuat', 'Replies': 'Balasan', 'Views': 'Dilihat', 'Last post': 'Terakhir' }
     }
   };
-  const LANG_PREF = store.get('lang', 'auto'); // auto | en | id
+  const LANG_PREF = store.get('lang', 'auto');
   const LANG = LANG_PREF === 'auto'
     ? (/^id\b/i.test(navigator.language || '') ? 'id' : 'en')
     : (DICT[LANG_PREF] ? LANG_PREF : 'en');
+  // Returns the translated text for a dictionary key
   const L = (k) => {
     const v = (DICT[LANG] || {})[k];
     return v !== undefined ? v : (DICT.en[k] !== undefined ? DICT.en[k] : k);
@@ -143,13 +140,6 @@
   }
   if (!store.get('enabled', true)) return;
 
-  /* ------------------------------------------------------------------ *
-   *  Anti-flash: script jalan di document-start, jadi halaman asli
-   *  langsung disembunyikan sampai UI modern selesai dibangun.
-   *  Ada pengaman: otomatis ditampilkan lagi bila terjadi error / terlalu lama.
-   *  Viewport meta juga dipasang SEKARANG (bukan nanti) supaya halaman tidak
-   *  "zoom sendiri" setiap refresh.
-   * ------------------------------------------------------------------ */
   const BOOT_ID = 'btx-boot-style';
   safe(() => {
     const t = store.get('theme', 'auto');
@@ -170,6 +160,7 @@
       (document.head || document.documentElement).appendChild(m);
     }
   });
+  // Removes the anti-flash cover so the page becomes visible
   function unboot() {
     safe(() => {
       document.documentElement.classList.remove('btx-boot');
@@ -177,21 +168,22 @@
       if (s && s.parentNode) s.parentNode.removeChild(s);
     });
   }
-  setTimeout(unboot, 6000); // pengaman terakhir
+  setTimeout(unboot, 6000);
 
-  /* ------------------------------------------------------------------ *
-   *  Helper
-   * ------------------------------------------------------------------ */
+  // Returns the trimmed, whitespace-normalized text of an element
   const txt = (el) => ((el && el.textContent) || '').replace(/\s+/g, ' ').trim();
+  // Formats a number with Indonesian separators
   const num = (n) => { const v = parseInt(String(n).replace(/\D/g, ''), 10); return isNaN(v) ? String(n) : v.toLocaleString('id-ID'); };
+  // Translates the "Today at" prefix of a time string
   const idTime = (s) => (s || '').replace(/^Today at/, L('today'));
 
+  // Creates a DOM element with properties and children
   function h(tag, props, ...kids) {
     const e = document.createElement(tag);
     for (const [k, v] of Object.entries(props || {})) {
       if (v == null || v === false) continue;
       if (k === 'class') e.className = v;
-      else if (k === 'html') e.innerHTML = v; // hanya untuk SVG konstan
+      else if (k === 'html') e.innerHTML = v;
       else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
       else e.setAttribute(k, v === true ? '' : v);
     }
@@ -213,11 +205,10 @@
     font: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 19 9 5l6 14M5.5 14h7M15 19l3.5-8 2.5 8M16.2 16.5h4.6"/></svg>',
     palette: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 2-.9 2-2 0-.6-.3-1-.6-1.4-.3-.4-.4-.8-.4-1.2 0-1 .8-1.9 1.9-1.9H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7" r="1"/></svg>'
   };
+  // Creates an icon wrapper element from the icon table
   const icon = (name, cls) => h('span', { class: 'btx-ico ' + (cls || ''), html: ICON[name] });
 
-  /* ------------------------------------------------------------------ *
-   *  Parser
-   * ------------------------------------------------------------------ */
+  // Parses the child board links of a board cell
   function parseChildren(cell) {
     return [...cell.querySelectorAll('a')].map((a) => {
       const t = a.getAttribute('title') || '';
@@ -232,6 +223,7 @@
     });
   }
 
+  // Parses one board row into a board object
   function parseBoard(tr) {
     const tds = tr.children;
     const info = tds[1];
@@ -273,6 +265,7 @@
     };
   }
 
+  // Parses all boards found inside a container
   function parseBoardsIn(box) {
     const out = [];
     let cur = null;
@@ -290,6 +283,7 @@
     return out;
   }
 
+  // Parses the index page into categories with boards
   function parseCategories() {
     const cats = [];
     document.querySelectorAll('#bodyarea div.tborder').forEach((box) => {
@@ -302,6 +296,7 @@
     return cats;
   }
 
+  // Parses the forum header: user info, quick links, navigation and search form
   function parseHeader() {
     const quick = {
       'action=unreadreplies': L('qReplies'),
@@ -340,6 +335,7 @@
     };
   }
 
+  // Parses the info center: recent posts and forum statistics
   function parseInfo() {
     const root = document.querySelector('#upshrinkHeaderIC');
     const recent = [];
@@ -365,7 +361,7 @@
     return { recent, stats };
   }
 
-  /* ---- halaman board ---- */
+  // Parses a page navigation element into a list of pager items
   function parsePager(el) {
     el = el || document.getElementById('toppages');
     if (!el) return null;
@@ -385,6 +381,7 @@
     return items.length ? items : null;
   }
 
+  // Parses the topic rows of a board page
   function parseTopics() {
     const rows = [];
     document.querySelectorAll('#bodyarea tr').forEach((tr) => {
@@ -424,6 +421,7 @@
     return rows;
   }
 
+  // Parses a whole board page: breadcrumbs, child boards, actions, sorting, pager and topics
   function parseBoardPage() {
     const body = document.getElementById('bodyarea');
     const navEl = body.querySelector('div.nav');
@@ -458,9 +456,6 @@
     };
   }
 
-  /* ------------------------------------------------------------------ *
-   *  Gaya
-   * ------------------------------------------------------------------ */
   const CSS = `
 :root{
   --bg:#E5E5E8; --surface:#F6F6F6; --surface2:#ECEDF3; --text:#000000; --muted:#666666;
@@ -517,7 +512,6 @@ body.btx-full > *:not(#btx-app){display:none !important}
 #btx-app :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
 .btx-ico{display:inline-flex;align-items:center;justify-content:center;line-height:0}
 
-/* top bar */
 .btx-top{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:10px;
   padding:10px max(14px,env(safe-area-inset-right)) 10px max(14px,env(safe-area-inset-left));
   padding-top:max(10px,env(safe-area-inset-top));
@@ -545,7 +539,6 @@ body.btx-full > *:not(#btx-app){display:none !important}
 .btx-shellrow .btx-quick{margin-top:0}
 .btx-shellrow .btx-tools{margin-top:0;flex:1 1 320px;max-width:460px;grid-template-columns:minmax(0,1fr) !important}
 
-/* shell (halaman non-index/board): nav di kiri, search di kanan; mobile ditumpuk */
 .btx-shellbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-top:12px}
 .btx-shellbar .btx-nav{margin:0;padding:0;flex:1 1 auto;min-width:0}
 .btx-shellsearch{flex:0 1 380px;min-width:240px;margin-left:auto;display:grid;gap:8px}
@@ -555,7 +548,6 @@ body.btx-full > *:not(#btx-app){display:none !important}
   .btx-shellsearch{flex:none;width:100%;min-width:0;margin-left:0}
 }
 
-/* hero */
 .btx-hero{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:16px}
 .btx-hero-top{display:flex;flex-wrap:wrap;align-items:center;gap:14px}
 .btx-hero-txt{min-width:0;flex:1 1 160px}
@@ -583,13 +575,11 @@ div.btx-avatar{display:grid;place-items:center;width:64px;height:64px;font-weigh
 .btx-news a{color:var(--accent) !important;font-weight:600}
 .btx-news b{color:var(--text)}
 
-/* nav */
 .btx-nav{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;padding:2px 0 6px}
 .btx-nav a{flex:none;padding:8px 15px;border-radius:12px;font-size:14px;font-weight:500;color:var(--muted) !important;
   background:var(--surface);border:1px solid var(--border)}
 .btx-nav a.on{background:var(--accent);color:var(--on-accent) !important;border-color:transparent;font-weight:600}
 
-/* search + filter */
 .btx-tools{display:grid;gap:10px;margin-top:12px}
 .btx-tools{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
 .btx-field{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);
@@ -598,14 +588,12 @@ div.btx-avatar{display:grid;place-items:center;width:64px;height:64px;font-weigh
 .btx-field input{flex:1;min-width:0;border:0;background:transparent;color:var(--text);font:inherit;font-size:16px;outline:0;height:100%}
 .btx-field input::placeholder{color:var(--muted)}
 .btx-go{border:0;background:var(--accent);color:var(--on-accent) !important;border-radius:10px;height:34px;padding:0 14px;font-weight:600;font-size:14px}
-/* dropdown pilihan sumber pencarian (Forum / BitList) - hanya di halaman thread & halaman lain */
 .btx-sel{flex:none;height:34px;max-width:112px;border:0;border-radius:10px;background:var(--surface2);color:var(--text);
   font:inherit;font-size:13px;font-weight:600;padding:0 6px;cursor:pointer;outline:0;text-overflow:ellipsis}
 .btx-sel:focus-visible{outline:2px solid var(--accent)}
 .btx-field.btx-multi{gap:8px}
 @media(max-width:760px){.btx-sel{font-size:16px}}
 
-/* categories */
 .btx-cat{margin-top:22px;min-width:0}
 .btx-cat-h{width:100%;display:flex;align-items:center;gap:8px;background:transparent;border:0;padding:6px 4px;text-align:left}
 .btx-cat-h h2,.btx-sec-h{margin:0;font-size:17px;font-weight:700;letter-spacing:-.01em}
@@ -618,7 +606,6 @@ div.btx-avatar{display:grid;place-items:center;width:64px;height:64px;font-weigh
 @media(min-width:760px){.btx-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(min-width:1100px){.btx-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 
-/* board card */
 .btx-board{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--border);
   border-radius:var(--r-lg);padding:14px;box-shadow:var(--shadow);min-width:0}
 .btx-b-main{display:block;min-width:0}
@@ -644,7 +631,6 @@ body.btx-compact .btx-b-desc,body.btx-compact .btx-b-mod{display:none}
 body.btx-nodesc .btx-b-desc{display:none}
 .btx-empty{margin:30px 0;text-align:center;color:var(--muted)}
 
-/* info center */
 .btx-info{margin-top:26px;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:16px}
 .btx-info h2{margin:0 0 12px;font-size:17px;font-weight:700}
 .btx-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
@@ -661,7 +647,6 @@ body.btx-nodesc .btx-b-desc{display:none}
 .btx-foot{margin-top:24px;text-align:center;font-size:12px;color:var(--muted)}
 .btx-markall{border:0;background:transparent;color:var(--muted) !important;font-size:13px;text-decoration:underline !important;padding:6px}
 
-/* halaman board */
 .btx-crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;padding:2px 0 6px;margin-top:8px;font-size:13px}
 .btx-crumbs::-webkit-scrollbar{display:none}
 .btx-crumbs a,.btx-crumbs span{min-width:0;color:var(--muted) !important;overflow-wrap:anywhere}
@@ -726,7 +711,6 @@ body.btx-legacy #bodyarea td.btx-pgcell{padding:6px 0}
   body.btx-legacy #bodyarea tr:has(> td.btx-pgcell) > td{display:block;width:100% !important}
 }
 
-/* settings sheet */
 .btx-overlay{position:fixed;inset:0;z-index:50;background:rgba(10,10,25,.45);display:none;align-items:flex-end;justify-content:center}
 .btx-overlay.open{display:flex}
 .btx-sheet{width:100%;max-width:480px;background:var(--surface);color:var(--text);border-radius:24px 24px 0 0;padding:18px 18px calc(22px + env(safe-area-inset-bottom));
@@ -751,7 +735,6 @@ body.btx-legacy #bodyarea td.btx-pgcell{padding:6px 0}
 .btx-switch button.on::after{transform:translateX(20px)}
 .btx-link{background:transparent;border:0;color:var(--muted);font-size:13px;text-decoration:underline;padding:0}
 
-/* ===== Panel hasil BitList ===== */
 .btx-blsheet{max-width:860px;max-height:88vh;overflow:auto;padding-top:14px}
 .btx-bl-actions{display:flex;align-items:center;gap:8px}
 .btx-bl-sum{font-size:13px;color:var(--muted);margin:6px 0 10px}
@@ -769,7 +752,6 @@ body.btx-legacy #bodyarea td.btx-pgcell{padding:6px 0}
 .btx-bl-msg{margin:24px 0;text-align:center;color:var(--muted)}
 .btx-tag.bad{background:#c0392b;color:#fff !important}
 
-/* ===== Skin untuk halaman lain (topik, help, profil, dll) ===== */
 body.btx-legacy{margin:0;background:var(--bg);color:var(--text);
   font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;-webkit-text-size-adjust:100%}
 body.btx-legacy #bodyarea{box-sizing:border-box;width:100%;max-width:1180px;margin:0 auto !important;padding:16px max(14px,env(safe-area-inset-left)) 28px !important;overflow-x:auto;color:var(--text)}
@@ -813,15 +795,12 @@ body.btx-legacy #footerarea a{color:var(--muted)}
 body.btx-legacy #bodyarea .btx-line{display:inline-block; white-space:nowrap; vertical-align:baseline;
 }
 
-/* ===== Signature mode sederhana (browser/WebView lawas tanpa Shadow DOM modern) =====
-   Signature tetap di tempatnya & selalu terlihat; hanya dibatasi lebarnya agar bisa digeser. */
 body.btx-legacy #bodyarea .btx-sigplain{display:block !important;visibility:visible !important;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
 body.btx-legacy #bodyarea .btx-sigplain img{max-width:100%;height:auto}
 :root[data-theme="dark"] body.btx-legacy #bodyarea .btx-sigplain{background:#eceef5;padding:8px;border-radius:12px;color:#000}
 :root[data-theme="dark"] body.btx-legacy #bodyarea .btx-sigplain *{color:#000}
 :root[data-theme="dark"] body.btx-legacy #bodyarea .btx-sigplain a{color:#0645ad}
 
-/* ===== Formulir (balas, topik baru, pengaturan profil) ===== */
 body.btx-legacy #bodyarea form{max-width:100%}
 body.btx-legacy #bodyarea textarea{display:block;width:100%;max-width:100%;min-width:0;min-height:220px;box-sizing:border-box;resize:vertical;line-height:1.5}
 body.btx-legacy #bodyarea input[type="text"],body.btx-legacy #bodyarea input[type="password"],body.btx-legacy #bodyarea input[type="search"],
@@ -844,7 +823,6 @@ body.btx-legacy #bodyarea img.userimg{max-width:100%;height:auto}
   body.btx-legacy #bodyarea select,body.btx-legacy #bodyarea textarea{font-size:16px}
 }
 
-/* ===== Halaman thread: kartu post rapi + avatar tidak terpotong ===== */
 body.btx-legacy #bodyarea .btx-ptable{width:100% !important;table-layout:fixed !important;border-collapse:collapse}
 body.btx-legacy #bodyarea .btx-ptable > tbody > tr > td:not(.btx-pcell){width:auto !important;min-width:0}
 body.btx-legacy #bodyarea .btx-pcell{width:210px !important;min-width:0;max-width:210px;overflow:visible !important;
@@ -893,30 +871,66 @@ body.btx-legacy #bodyarea .btx-pcell:not(.btx-rebuilt) img.avatar{max-width:100%
   body.btx-legacy #bodyarea .btx-ptable > tbody > tr,
   body.btx-legacy #bodyarea .btx-ptable > tbody > tr > td{display:block;width:100% !important;max-width:100% !important;box-sizing:border-box}
   body.btx-legacy #bodyarea .btx-ptable > tbody > tr > td{padding-left:2px;padding-right:2px}
-  body.btx-legacy #bodyarea .btx-pcell{padding:12px 4px 8px !important}
-  /* mobile: avatar + nama/rank di atas; statistik, info tambahan (script lain), dan aksi turun ke baris penuh di bawahnya */
+  body.btx-legacy #bodyarea .btx-pcell{padding:6px 2px 4px !important}
   body.btx-legacy #bodyarea .btx-pi{display:grid;grid-template-columns:auto minmax(0,1fr);
-    grid-template-areas:"av name" "av rank" "av stars" "av fill" "st st" "ex ex" "ac ac";
-    grid-template-rows:auto auto auto minmax(0,1fr) auto auto auto;
-    text-align:left;align-items:start;column-gap:12px;row-gap:0;
-    padding:10px;border-radius:14px;background:var(--surface2);border-left:4px solid var(--accent)}
+    grid-template-areas:"av name" "av rank" "av stars" "av st" "ex ex" "ac ac";
+    grid-template-rows:auto auto auto minmax(0,1fr) auto auto;
+    text-align:left;align-items:start;column-gap:10px;row-gap:0;
+    padding:8px;border-radius:12px;background:var(--surface2);border-left:3px solid var(--accent)}
   body.btx-legacy #bodyarea .btx-pi.noav{grid-template-columns:minmax(0,1fr);grid-template-areas:"name" "rank" "stars" "st" "ex" "ac";grid-template-rows:none}
   body.btx-legacy #bodyarea .btx-pi-av{grid-area:av;width:92px;max-width:92px;align-items:flex-start}
   body.btx-legacy #bodyarea .btx-pi-av img{max-width:92px !important;max-height:140px}
   body.btx-legacy #bodyarea .btx-pi-id{display:contents}
-  body.btx-legacy #bodyarea .btx-pi-name{grid-area:name;min-width:0}
-  body.btx-legacy #bodyarea .btx-pi-rank{grid-area:rank}
-  body.btx-legacy #bodyarea .btx-pi-stars{grid-area:stars;margin-top:2px}
-  body.btx-legacy #bodyarea .btx-pi-stats{grid-area:st;justify-content:flex-start;margin-top:10px;gap:4px;width:100%}
-  body.btx-legacy #bodyarea .btx-pi-stat{font-size:11px;padding:2px 8px}
-  body.btx-legacy #bodyarea .btx-pi-stats.many .btx-pi-stat{font-size:10px;padding:1px 6px}
-  body.btx-legacy #bodyarea .btx-pi-extra{grid-area:ex;margin-top:8px;font-size:11px}
-  body.btx-legacy #bodyarea .btx-pi-extra.many{font-size:10.5px;padding:6px 8px}
-  body.btx-legacy #bodyarea .btx-pi-acts{grid-area:ac;justify-content:flex-start;margin-top:8px}
+  body.btx-legacy #bodyarea .btx-pi-name{grid-area:name;min-width:0;font-size:14px;line-height:1.25}
+  body.btx-legacy #bodyarea .btx-pi-rank{grid-area:rank;font-size:11.5px;line-height:1.3}
+  body.btx-legacy #bodyarea .btx-pi-stars{grid-area:stars;margin-top:1px}
+  body.btx-legacy #bodyarea .btx-pi-stats{grid-area:st;align-self:start;justify-content:flex-start;margin-top:5px;gap:3px;width:100%}
+  body.btx-legacy #bodyarea .btx-pi-stat{font-size:10.5px;padding:1px 7px;gap:3px;line-height:1.4}
+  body.btx-legacy #bodyarea .btx-pi-stats.many .btx-pi-stat{font-size:9.5px;padding:1px 6px}
+  body.btx-legacy #bodyarea .btx-pi-extra{grid-area:ex;margin-top:6px;font-size:10.5px;padding:6px 8px;gap:2px}
+  body.btx-legacy #bodyarea .btx-pi-extra.many{font-size:10px;padding:5px 7px}
+  body.btx-legacy #bodyarea .btx-pi-acts{grid-area:ac;justify-content:flex-start;margin-top:6px;gap:6px 12px}
   body.btx-legacy #bodyarea .btx-pi-extra{background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
 }
 
-/* ===== Thread: bar pager + aksi, kartu post, tampilan mobile ===== */
+#btx-stat-tip{position:fixed;z-index:2147483000;display:none;max-width:calc(100vw - 16px);padding:4px 9px;border-radius:8px;
+  background:var(--text);color:var(--bg);font:600 12px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  white-space:nowrap;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+body.btx-legacy #bodyarea .btx-pi-stat .abv{display:none}
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pcell{padding:4px 2px 2px !important}
+  body.btx-legacy #bodyarea .btx-pi{padding:6px 8px;column-gap:8px;border-radius:10px;border-left-width:3px}
+  body.btx-legacy #bodyarea .btx-pi-av{width:84px;max-width:84px}
+  body.btx-legacy #bodyarea .btx-pi-av img{max-width:84px !important;max-height:110px;border-radius:10px}
+  body.btx-legacy #bodyarea .btx-pi-name{font-size:13px;line-height:1.2}
+  body.btx-legacy #bodyarea .btx-op{padding:0 6px;font-size:10px;margin-left:4px}
+  body.btx-legacy #bodyarea .btx-pi-rank{font-size:11px;line-height:1.2}
+  body.btx-legacy #bodyarea .btx-pi-stars{margin-top:0;line-height:0}
+  body.btx-legacy #bodyarea .btx-pi-stars img{height:11px !important;width:auto !important}
+  body.btx-legacy #bodyarea .btx-pi-stats{margin-top:3px;gap:2px}
+  body.btx-legacy #bodyarea .btx-pi-stat{font-size:10px;padding:1px 6px;gap:3px}
+  body.btx-legacy #bodyarea .btx-pi-stats.many .btx-pi-stat{font-size:9.5px;padding:1px 5px}
+  body.btx-legacy #bodyarea .btx-pi-extra{margin-top:4px;padding:4px 7px;font-size:10px;gap:1px}
+  body.btx-legacy #bodyarea .btx-pi-acts{margin-top:4px;gap:4px 10px;font-size:11px}
+  body.btx-legacy #bodyarea .btx-pi-acts img{height:15px;width:auto}
+  body.btx-legacy #bodyarea .btx-pi-stat.ab .full{display:none}
+  body.btx-legacy #bodyarea .btx-pi-stat.ab .abv{display:inline}
+  body.btx-legacy #bodyarea .btx-pi-stat.ab{position:relative;cursor:help}
+  body.btx-legacy #bodyarea .btx-pi-stat.ab em{font-weight:700;min-width:1.4em}
+}
+
+@media(min-width:380px) and (max-width:759px){
+  body.btx-legacy #bodyarea .btx-pi{grid-template-columns:auto minmax(0,1fr) minmax(0,auto);
+    grid-template-areas:"av name st" "av rank st" "av stars st" "ex ex ex" "ac ac ac";
+    grid-template-rows:auto auto minmax(0,1fr) auto auto;column-gap:12px}
+  body.btx-legacy #bodyarea .btx-pi.noav{grid-template-columns:minmax(0,1fr) minmax(0,auto);
+    grid-template-areas:"name st" "rank st" "stars st" "ex ex" "ac ac";grid-template-rows:auto auto auto auto auto}
+  body.btx-legacy #bodyarea .btx-pi-stats{flex-direction:column;flex-wrap:nowrap;align-items:flex-start;justify-content:flex-start;
+    width:auto;max-width:130px;margin-top:0;gap:0}
+  body.btx-legacy #bodyarea .btx-pi-stat{background:transparent;border-radius:0;padding:0;font-size:10.5px;line-height:1.3;gap:3px}
+  body.btx-legacy #bodyarea .btx-pi-stats.many .btx-pi-stat{font-size:9.5px;padding:0}
+}
+
 body.btx-legacy #bodyarea .mirrortab_back,body.btx-legacy #bodyarea .maintab_back{font-size:0 !important;line-height:0}
 body.btx-legacy #bodyarea .mirrortab_back a,body.btx-legacy #bodyarea .maintab_back a{font-size:13px;line-height:1.4;margin:3px 6px 3px 0}
 body.btx-legacy #bodyarea .btx-pgbar,body.btx-legacy #bodyarea .btx-pgbar > tbody{display:block;width:100% !important;margin-bottom:14px}
@@ -928,7 +942,6 @@ body.btx-legacy #bodyarea .btx-pgbar .btx-pager2{justify-content:flex-start;marg
 body.btx-legacy #bodyarea .btx-pgbar div.nav{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px 12px;margin:0 0 4px !important;font-size:12.5px}
 body.btx-legacy #bodyarea .btx-pgbar td table{margin-left:auto}
 
-/* bar paginasi + tombol aksi di halaman thread: kecil, sejajar, mudah dibaca */
 body.btx-legacy #bodyarea .btx-pgbar .btx-pager{gap:6px;padding:0;margin:0;align-items:center}
 body.btx-legacy #bodyarea .btx-pgbar .btx-pager .pg{min-width:28px;height:28px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:700;line-height:1;
   background:var(--surface);color:var(--text) !important;border:1px solid color-mix(in srgb,var(--accent) 28%,var(--border));
@@ -964,7 +977,6 @@ body.btx-legacy #bodyarea td.msgcl1 > table{border-collapse:separate;border-spac
 body.btx-legacy #bodyarea td.msgcl1 > table > tbody > tr > td{border:1px solid var(--border);border-radius:16px;
   background:var(--surface);box-shadow:var(--shadow)}
 
-/* header thread (Author / Topic) menyatu dengan kartu post pertama, seperti kartu "Various links" */
 body.btx-legacy #bodyarea table.btx-thead{width:100% !important;border-collapse:separate !important;border-spacing:0;
   border:1px solid var(--accent) !important;border-bottom:0 !important;border-radius:16px 16px 0 0 !important;
   overflow:hidden;box-shadow:none !important;margin:0 !important;background:var(--accent)}
@@ -987,13 +999,11 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
   body.btx-legacy #bodyarea .btx-pgbar div.nav{justify-content:flex-start}
   body.btx-legacy #bodyarea .btx-pgbar td table{margin-left:0}
   body.btx-legacy #bodyarea td.msgcl1{padding-bottom:10px !important}
-  /* tabel pembungkus post dipaksa selebar layar agar kartu poster / judul / quote tidak terpotong */
   body.btx-legacy #bodyarea #quickModForm table:has(.btx-ptable),
   body.btx-legacy #bodyarea #quickModForm table:has(.btx-ptable) > tbody,
   body.btx-legacy #bodyarea #quickModForm table:has(.btx-ptable) > tbody > tr,
   body.btx-legacy #bodyarea #quickModForm table:has(.btx-ptable) > tbody > tr > td,
   body.btx-legacy #bodyarea #quickModForm td.msgcl1{display:block;width:100% !important;max-width:100% !important;min-width:0;box-sizing:border-box}
-  /* signature tidak boleh melebarkan tabel di atasnya; ukurannya diatur oleh fitSignature() */
   body.btx-legacy #bodyarea .btx-sighost{contain:inline-size !important;width:100% !important}
   body.btx-legacy #bodyarea .btx-pi{width:100%;max-width:100%;box-sizing:border-box}
   body.btx-legacy #bodyarea .td_headerandpost{min-width:0;max-width:100%;overflow-wrap:anywhere}
@@ -1011,42 +1021,118 @@ body.btx-legacy #bodyarea .btx-st img{display:block}
   .btx-nav a{padding:7px 12px;font-size:13px}
 }
 
-/* ukuran & jenis font (menu Font) - 3 target terpisah:
-   ui = menu & tombol, ct = isi post thread, cd = kartu board/topik
-   --btx-fs-*  = skala ukuran ; --btx-ff-* = jenis font ; data-fui/fct/fcd = font aktif */
 body.btx{font-size:15px}
 body.btx-legacy{font-size:14px}
 body.btx-legacy #bodyarea{font-size:14px}
 
-/* ukuran: MENU & TOMBOL (panel pengaturan sengaja tidak ikut) */
 .btx-top,.btx-hero,.btx-shellbar,.btx-tools,.btx-crumbs,.btx-sorts,.btx-acts,.btx-wrap > .btx-nav,.btx-wrap > .btx-pager{zoom:var(--btx-fs-ui,1)}
 body.btx-legacy #bodyarea .btx-pgbar{zoom:var(--btx-fs-ui,1);width:calc(100% / var(--btx-fs-ui,1)) !important}
-/* ukuran: ISI POST THREAD */
 body.btx-legacy #bodyarea .post{zoom:var(--btx-fs-ct,1)}
-/* ukuran: KARTU BOARD / TOPIK */
 body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap > .btx-grid,.btx-bhead h1,.btx-bhead .btx-bmod){zoom:var(--btx-fs-cd,1)}
 
-/* font: KARTU BOARD / TOPIK */
 :root[data-fcd="1"] :is(.btx-cat,.btx-grid,.btx-info,.btx-bhead,.btx-topics,.btx-sec-h,.btx-news),
 :root[data-fcd="1"] :is(.btx-cat,.btx-grid,.btx-info,.btx-bhead,.btx-topics,.btx-sec-h,.btx-news) *{font-family:var(--btx-ff-cd) !important}
 
-/* font: ISI POST THREAD */
 :root[data-fct="1"] body.btx-legacy #bodyarea .post,
 :root[data-fct="1"] body.btx-legacy #bodyarea .post *{font-family:var(--btx-ff-ct) !important}
 :root[data-fct="1"] body.btx-legacy #bodyarea .post :is(pre,code,.code,.codeheader),
 :root[data-fct="1"] body.btx-legacy #bodyarea .post :is(pre,code,.code,.codeheader) *{font-family:ui-monospace,Menlo,Consolas,monospace !important}
 
-/* font: MENU & TOMBOL */
 :root[data-fui="1"] :is(.btx-top,.btx-overlay,.btx-nav,.btx-quick,.btx-hero,.btx-shellbar,.btx-crumbs,.btx-sorts,.btx-acts,.btx-field,.btx-pager),
 :root[data-fui="1"] :is(.btx-top,.btx-overlay,.btx-nav,.btx-quick,.btx-hero,.btx-shellbar,.btx-crumbs,.btx-sorts,.btx-acts,.btx-field,.btx-pager) *,
 :root[data-fui="1"] #btx-app :is(button,input,select,textarea){font-family:var(--btx-ff-ui) !important}
 
 @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+
+.btx-quick {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 6px !important;
+    width: 100% !important;
+    margin-top: 12px !important;
+}
+
+.btx-chip {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    padding: 0 !important;
+    height: 32px !important;
+    font-size: 11px !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    border-radius: 8px !important;
+}
+
+body.btx-legacy #bodyarea .btx-pgbar td.mirrortab_back,
+body.btx-legacy #bodyarea .btx-pgbar td.maintab_back {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 6px !important;
+    font-size: 0 !important;
+}
+
+body.btx-legacy #bodyarea .btx-pgbar td.mirrortab_back a,
+body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
+    display: inline-flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    flex: 0 0 auto !important;
+    height: 30px !important;
+    font-size: 12px !important;
+    padding: 0 12px !important;
+    box-sizing: border-box !important;
+    border-radius: 8px !important;
+}
+
+@media (max-width: 759px) {
+    body.btx-legacy #bodyarea .btx-pgbar td table,
+    body.btx-legacy #bodyarea .btx-pgbar td table > tbody,
+    body.btx-legacy #bodyarea .btx-pgbar td table > tbody > tr,
+    body.btx-legacy #bodyarea .btx-pgbar td table > tbody > tr > td {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+    }
+
+    body.btx-legacy #bodyarea .btx-pgbar td.mirrortab_back,
+    body.btx-legacy #bodyarea .btx-pgbar td.maintab_back {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        justify-content: space-between !important;
+        width: 100% !important;
+        margin: 6px 0 0 0 !important;
+    }
+
+    body.btx-legacy #bodyarea .btx-pgbar td.mirrortab_back a,
+    body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
+        flex: 1 1 0% !important;
+        padding: 0 2px !important;
+        font-size: 11px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    body.btx-legacy #bodyarea td.btx-pgcell {
+        margin-bottom: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    body.btx-legacy #bodyarea .btx-pgbar {
+        margin-bottom: 0 !important;
+    }
+    body.btx-legacy #bodyarea #quickModForm > table.bordercolor {
+        margin-top: 4px !important;
+    }
+}
+
 `;
 
-  /* ------------------------------------------------------------------ *
-   *  Tema
-   * ------------------------------------------------------------------ */
   const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
   const prefs = {
     theme: store.get('theme', 'auto'),
@@ -1055,6 +1141,7 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     desc: store.get('desc', true),
     sig: store.get('sig', true),
     pinfo: store.get('pinfo', true),
+    pabbr: store.get('pabbr', true),
     bitlist: store.get('bitlist', true),
     blinline: store.get('blinline', true),
     fsUi: store.get('fsUi', store.get('fsize', 100)),
@@ -1063,11 +1150,10 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     ffUi: store.get('ffUi', store.get('ffamily', 'default')),
     ffPost: store.get('ffPost', store.get('ffamily', 'default')),
     ffCard: store.get('ffCard', store.get('ffamily', 'default')),
-    fx: ((v) => (['all', 'ui', 'post', 'card'].includes(v) ? v : (v === 'content' ? 'post' : 'all')))(store.get('fx', 'all')) // all | ui | post | card
+    fx: ((v) => (['all', 'ui', 'post', 'card'].includes(v) ? v : (v === 'content' ? 'post' : 'all')))(store.get('fx', 'all'))
   };
   const collapsed = store.get('collapsed', {});
 
-  // Menu Tampermonkey: BitList on / off
   if (typeof GM_registerMenuCommand === 'function') {
     GM_registerMenuCommand(L('blMenu') + (prefs.bitlist ? 'ON' : 'OFF'), () => {
       store.set('bitlist', !prefs.bitlist);
@@ -1075,6 +1161,7 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     });
   }
 
+  // Returns the active theme as light or dark
   function resolvedTheme() {
     if (prefs.theme === 'auto') return mq && mq.matches ? 'dark' : 'light';
     return prefs.theme;
@@ -1088,6 +1175,7 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     palatino: '"Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif',
     casual: '"Comic Sans MS","Comic Neue","Chalkboard SE",cursive,sans-serif'
   };
+  // Applies theme, accent, font and layout preferences to the page
   function applyPrefs() {
     const root = document.documentElement;
     root.setAttribute('data-theme', resolvedTheme());
@@ -1108,13 +1196,11 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     if (tb) { tb.innerHTML = ''; tb.append(icon(resolvedTheme() === 'dark' ? 'sun' : 'moon')); }
   }
 
+  // Updates one preference, saves it and re-applies all preferences
   function setPref(k, v) { prefs[k] = v; store.set(k, v); applyPrefs(); }
   if (mq && mq.addEventListener) mq.addEventListener('change', () => { if (prefs.theme === 'auto') applyPrefs(); });
 
-  /* ------------------------------------------------------------------ *
-   *  Komponen bersama
-   * ------------------------------------------------------------------ */
-  // Pembuat panel (sheet) umum: dipakai untuk Pengaturan, Bahasa, Font, dan Warna
+  // Builds a generic bottom sheet dialog used by all settings panels
   function sheetOf(id, title, rows) {
     const overlay = h('div', { class: 'btx-overlay', id, role: 'dialog', 'aria-modal': 'true', 'aria-label': title });
     const close = () => overlay.classList.remove('open');
@@ -1128,6 +1214,7 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     return { overlay, open: () => overlay.classList.add('open') };
   }
 
+  // Builds the settings, language, color and font panels
   function settingsSheet() {
     const seg = h('div', { class: 'btx-seg' });
     [['auto', L('auto')], ['light', L('light')], ['dark', L('dark')]].forEach(([v, label]) => {
@@ -1189,7 +1276,6 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
       } }, label));
     });
 
-    // Target: Semua / Menu & tombol / Isi thread / Kartu board
     const fxSeg = h('div', { class: 'btx-seg', style: 'grid-template-columns:repeat(2,1fr)' });
     [['all', L('fxAll')], ['ui', L('fxUi')], ['post', L('fxContent')], ['card', L('fxCard')]].forEach(([v, label]) => {
       const b = h('button', { class: prefs.fx === v ? 'on' : '', onclick: () => {
@@ -1211,6 +1297,7 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
       h('div', { class: 'btx-row' }, toggle(L('blInline'), 'blinline')),
       h('div', { class: 'btx-row' }, toggle(L('sigOriginal'), 'sig', true)),
       h('div', { class: 'btx-row' }, toggle(L('pinfoRebuild'), 'pinfo', true)),
+      h('div', { class: 'btx-row' }, toggle(L('pabbr'), 'pabbr', true)),
       h('div', { class: 'btx-row' }, h('button', { class: 'btx-link', onclick: () => { store.set('enabled', false); location.reload(); } },
         L('backOrig')))
     ]);
@@ -1232,6 +1319,7 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     };
   }
 
+  // Builds the sticky top bar with brand and tool buttons
   function makeTopbar(sheet) {
     return h('header', { class: 'btx-top' },
       h('a', { class: 'btx-brand', href: '/index.php' }, h('span', { class: 'btx-logo' }, '\u20BF'), 'Bitcoin Forum'),
@@ -1246,18 +1334,21 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     );
   }
 
+  // Builds the main navigation chips
   function navEl(head) {
     if (!head.nav.length) return null;
     return h('nav', { class: 'btx-nav', 'aria-label': L('mainNav') },
       head.nav.map((n) => h('a', { class: n.active ? 'on' : '', href: n.href }, n.name)));
   }
 
+  // Builds the quick link row (unread, replies, patrol, watchlist)
   function quickRow(head, slim) {
     if (!head.links.length) return null;
     return h('div', { class: 'btx-quick' + (slim ? ' slim' : '') },
       head.links.map((l, i) => h('a', { class: 'btx-chip' + (i > 1 ? ' ghost' : ''), href: l.href }, l.name)));
   }
 
+  // Builds the forum search form
   function searchForm(head) {
     const scoped = head.searchHidden.some((x) => /^brd\[/.test(x.name));
     return h('form', { class: 'btx-field', method: 'post', action: head.searchAction, 'accept-charset': 'ISO-8859-1' },
@@ -1268,9 +1359,9 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     );
   }
 
-  /* Pencarian gabungan (hanya halaman thread & halaman lain): satu kolom, dropdown memilih Forum asli atau BitList */
+  // Builds the combined search box that switches between forum and BitList
   function searchBox(head) {
-    if (!prefs.bitlist) return searchForm(head); // BitList dimatikan -> pencarian forum biasa
+    if (!prefs.bitlist) return searchForm(head);
     const scoped = head.searchHidden.some((x) => /^brd\[/.test(x.name));
     let mode = store.get('smode', 'forum');
     if (mode !== 'bitlist') mode = 'forum';
@@ -1299,11 +1390,13 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     );
   }
 
+  // Builds a filter input field
   function filterField(placeholder) {
     const input = h('input', { type: 'search', placeholder, 'aria-label': placeholder, autocomplete: 'off' });
     return { input, el: h('div', { class: 'btx-field' }, icon('search'), input) };
   }
 
+  // Builds one board card
   function boardCard(b) {
     const search = [b.name, b.desc, b.children.map((c) => c.name).join(' ')].join(' ').toLowerCase();
     return h('article', { class: 'btx-board', 'data-s': search },
@@ -1330,6 +1423,7 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     );
   }
 
+  // Builds a simple pager from parsed items
   function pagerEl(items) {
     if (!items) return null;
     const wrap = h('nav', { class: 'btx-pager', 'aria-label': L('pages') });
@@ -1341,6 +1435,7 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     return wrap;
   }
 
+  // Builds the full pager with first, previous, next, last and page jump
   function buildPager(items, strict) {
     if (!items) return null;
     const cur = items.find((i) => i.current);
@@ -1387,6 +1482,7 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     return wrap;
   }
 
+  // Replaces the original page navigation cells with the modern pager
   function upgradePagers() {
     document.querySelectorAll('#bodyarea td.middletext').forEach((td) => {
       if (td.classList.contains('btx-pgcell') || !/^\s*Pages:/.test(td.textContent)) return;
@@ -1395,7 +1491,6 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
       if (td.querySelector('a.navPages')) {
         pg = buildPager(parsePager(td), true);
       } else {
-        // Thread / halaman dengan 1 halaman saja: tampilkan satu tombol halaman supaya bar tetap rapi
         const m = txt(td).match(/\[\s*(\d+)\s*\]/);
         pg = h('nav', { class: 'btx-pager btx-pager2', 'aria-label': L('pages') },
           h('span', { class: 'pg on', 'aria-current': 'page' }, m ? m[1] : '1'));
@@ -1409,6 +1504,7 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     });
   }
 
+  // Scrolls each pager so the current page is centered
   function centerPagers() {
     document.querySelectorAll('.btx-pager').forEach((p) => {
       const on = p.querySelector('.on');
@@ -1416,10 +1512,7 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     });
   }
 
-  /* ------------------------------------------------------------------ *
-   *  Halaman thread: header (Author / Topic) disatukan dengan kartu post pertama
-   *  Header asli: <table class="tborder"><tr class="catbg3"> ... <td id="top_subject">
-   * ------------------------------------------------------------------ */
+  // Joins the thread header (Author / Topic) with the first post card
   function joinThreadHead() {
     const sub = document.getElementById('top_subject');
     const tbl = sub && sub.closest('table');
@@ -1429,11 +1522,55 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     if (first) first.classList.add('btx-firstpost');
   }
 
-  /* ------------------------------------------------------------------ *
-   *  Halaman thread: tata ulang info poster (avatar utuh, tidak terpotong)
-   * ------------------------------------------------------------------ */
-  // Membuat kartu dari KLONING info asli. Elemen asli tetap ada di DOM (disembunyikan)
-  // agar userscript/ekstensi lain tetap bisa menemukan dan mengubahnya.
+  // Builds an uppercase initials label from a stat name, one letter per word
+  function statAbbr(name) {
+    const words = String(name || '').split(/[\s_\-\/.]+/).filter(Boolean);
+    if (!words.length) return '';
+    if (words.length === 1) return words[0].charAt(0).toUpperCase();
+    return words.slice(0, 3).map((w) => w.charAt(0)).join('').toUpperCase();
+  }
+
+  let statTipEl = null, statTipSrc = null, statTipTimer = null, statTipBound = false;
+
+  // Hides the stat tooltip
+  function hideStatTip() {
+    clearTimeout(statTipTimer);
+    if (statTipEl) statTipEl.style.display = 'none';
+    statTipSrc = null;
+  }
+
+  // Shows the full stat name in a tooltip kept inside the visible screen, hides it on a second tap
+  function toggleStatTip(e) {
+    const el = e.currentTarget;
+    if (statTipEl && statTipSrc === el && statTipEl.style.display === 'block') { hideStatTip(); return; }
+    hideStatTip();
+    if (!statTipEl) {
+      statTipEl = h('div', { id: 'btx-stat-tip', role: 'tooltip' });
+      document.body.append(statTipEl);
+    }
+    if (!statTipBound) {
+      statTipBound = true;
+      document.addEventListener('click', (ev) => { if (!(ev.target.closest && ev.target.closest('.btx-pi-stat.ab'))) hideStatTip(); });
+      window.addEventListener('scroll', hideStatTip, { passive: true });
+      window.addEventListener('resize', hideStatTip);
+    }
+    statTipEl.textContent = el.getAttribute('data-full') || '';
+    statTipEl.style.left = '0px';
+    statTipEl.style.top = '0px';
+    statTipEl.style.display = 'block';
+    const r = el.getBoundingClientRect();
+    const tw = statTipEl.offsetWidth;
+    const th = statTipEl.offsetHeight;
+    const vw = document.documentElement.clientWidth || window.innerWidth;
+    const left = Math.max(8, Math.min(r.left, vw - tw - 8));
+    const top = r.top - th - 6 >= 8 ? r.top - th - 6 : r.bottom + 6;
+    statTipEl.style.left = Math.round(left) + 'px';
+    statTipEl.style.top = Math.round(top) + 'px';
+    statTipSrc = el;
+    statTipTimer = setTimeout(hideStatTip, 2500);
+  }
+
+  // Builds the poster info card from clones of the original poster info
   function posterCard(td) {
     const inCard = (n) => !!(n.closest && n.closest('.btx-pi'));
     const info = [...td.querySelectorAll('div.smalltext')].find((d) => !inCard(d));
@@ -1452,7 +1589,6 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     const av = [], stars = [], acts = [], extraLines = [], stats = [], status = [];
     let rank = '', op = false, lastStat = null;
 
-    // Pecah teks gabungan seperti "Posts: 1606Score: 25% - Good" menjadi beberapa statistik
     const splitStats = (t) => {
       const re = /(Activity|Merit|Posts|Score)\s*:/gi;
       const idx = [];
@@ -1497,7 +1633,6 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
         lastStat.v += ' \u2022 ' + t.replace(/^-\s*/, '');
         return;
       }
-      // Statistik tambahan dari script lain berbentuk "Label: nilai" -> jadi chip juga
       const g = rank && t.length < 60 && t.match(/^([A-Za-z][A-Za-z0-9 ._\/%-]{0,22}):\s*(\S.*)$/);
       if (g) { addStat(g[1], g[2], colorOf(l)); return; }
       if (/^Ignore$/i.test(t)) { acts.push(...l); return; }
@@ -1505,7 +1640,6 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
       extraLines.push(l);
     });
 
-    // Node lain di luar div.smalltext (mis. ditambah script lain)
     const loose = [...td.childNodes].filter((n) =>
       n !== nameEl && n !== info &&
       !(n.nodeType === 1 && (n.tagName === 'BR' || n.classList.contains('btx-pi'))) &&
@@ -1527,19 +1661,21 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
         rank && h('div', { class: 'btx-pi-rank' }, rank),
         stars.length > 0 && h('div', { class: 'btx-pi-stars' }, stars),
         stats.length > 0 && h('div', { class: 'btx-pi-stats' + (stats.length > 5 ? ' many' : '') },
-          stats.map((s) => h('span', { class: 'btx-pi-stat' }, h('em', {}, s.k), h('b', { style: s.color ? 'color:' + s.color : null }, s.v))))
+          stats.map((s) => h('span', { class: 'btx-pi-stat' + (prefs.pabbr ? ' ab' : ''), title: s.k, 'data-full': s.k, onclick: prefs.pabbr ? toggleStatTip : null },
+            h('em', {}, h('span', { class: 'full' }, s.k), prefs.pabbr && h('span', { class: 'abv' }, statAbbr(s.k))), h('b', { style: s.color ? 'color:' + s.color : null }, s.v))))
       ),
       extra.length > 0 && h('div', { class: 'btx-pi-extra' + (extra.length > 2 ? ' many' : '') }, extra),
       acts.length > 0 && h('div', { class: 'btx-pi-acts' }, acts)
     );
   }
 
+  // Prepares one poster cell and keeps its card in sync with other scripts
   function buildPoster(td) {
     if (td.classList.contains('btx-pcell')) return;
     td.classList.add('btx-pcell');
     const tbl = td.closest('table');
     if (tbl) tbl.classList.add('btx-ptable');
-    if (!prefs.pinfo) return; // mode kompatibilitas: hanya perbaikan CSS
+    if (!prefs.pinfo) return;
 
     let mo = null, queued = false;
     const draw = () => {
@@ -1552,11 +1688,10 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
           td.classList.add('btx-rebuilt');
         }
       } catch (e) { td.classList.remove('btx-rebuilt'); }
-      if (mo) mo.takeRecords(); // abaikan perubahan buatan kita sendiri
+      if (mo) mo.takeRecords();
     };
     draw();
 
-    // Kalau script lain menambah/mengubah info poster belakangan, kartu ikut diperbarui
     mo = new MutationObserver((recs) => {
       if (queued) return;
       const external = recs.some((r) => {
@@ -1570,19 +1705,14 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     mo.observe(td, { childList: true, subtree: true, characterData: true });
   }
 
+  // Restyles every poster cell in the thread
   function restylePosts() {
     document.querySelectorAll('#bodyarea td.poster_info, #bodyarea td[width="16%"][rowspan="2"]').forEach((td) => {
-      try { buildPoster(td); } catch (e) { /* biarkan tampilan asli bila gagal */ }
+      try { buildPoster(td); } catch (e) {}
     });
   }
 
-  /* ------------------------------------------------------------------ *
-   *  Signature
-   *  - Browser modern (Shadow DOM + constructable stylesheet): diisolasi agar format
-   *    aslinya tidak berubah, lalu diperkecil seragam bila lebih lebar dari kartu.
-   *  - Browser / WebView lawas: JANGAN diisolasi. Signature dibiarkan di tempat aslinya
-   *    (kelas btx-sigplain, hanya dibatasi lebarnya) sehingga PASTI tetap muncul.
-   * ------------------------------------------------------------------ */
+  // Checks whether the browser supports shadow DOM isolation for signatures
   const canShadowIsolate = () => {
     try {
       return !!(Element.prototype.attachShadow &&
@@ -1594,13 +1724,14 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
   };
 
   let siteCss = null;
+  // Collects the site stylesheets into a constructable stylesheet
   function siteStyles() {
     if (siteCss) return siteCss;
     try {
       let css = '';
       [...document.styleSheets].forEach((ss) => {
         if (ss.ownerNode && (ss.ownerNode.id === 'btx-style' || ss.ownerNode.id === BOOT_ID)) return;
-        try { css += [...ss.cssRules].map((r) => r.cssText).join('\n') + '\n'; } catch (e) { /* stylesheet lintas-origin */ }
+        try { css += [...ss.cssRules].map((r) => r.cssText).join('\n') + '\n'; } catch (e) {}
       });
       const sheet = new CSSStyleSheet();
       sheet.replaceSync(css);
@@ -1609,18 +1740,15 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     return siteCss;
   }
 
-  // Signature yang lebih lebar dari kartu: dirender dulu pada lebar aslinya (layout sama seperti di desktop),
-  // lalu DIPERKECIL seragam dengan transform: scale(). Tidak memakai CSS zoom karena zoom di dalam
-  // Shadow DOM sering menggeser layout / merusak tampilan di WebView ponsel.
   const SIG_MOBILE = window.matchMedia ? window.matchMedia('(max-width:759px)') : null;
   const sigList = [];
   const sigHasContent = (sig) => !!(sig.textContent.trim() || sig.querySelector('img'));
 
-  const SIG_REF_MAX = 900; // lebar maksimum "desain asli" signature yang masih dianggap wajar
-  // Signature yang tata letaknya dibuat dengan spasi (&nbsp;), karakter blok/garis, gambar atau tabel
+  const SIG_REF_MAX = 900;
   const sigLayoutLike = (sig) => !!sig.querySelector('img, table') || /\u00a0{2}|[\u2500-\u259F]/.test(sig.textContent);
   const sigKey = (stage) => stage.offsetWidth + 'x' + stage.offsetHeight;
 
+  // Measures and scales one signature to fit its card
   function fitSignatureCore(entry) {
     const { host, stage, sig } = entry;
     if (!host.isConnected) return;
@@ -1633,19 +1761,18 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     if (avail <= 0) return;
     const wide = () => Math.max(stage.scrollWidth, stage.offsetWidth);
 
-    // Lebar "asli" tanpa pembungkusan baris (seperti tampil di desktop)
     stage.style.whiteSpace = 'nowrap';
     const nW = wide();
     stage.style.whiteSpace = '';
 
     let layoutW = 0;
     if (nW > avail + 1 && nW <= SIG_REF_MAX && sigLayoutLike(sig)) {
-      layoutW = Math.ceil(nW) + 2; // render pada lebar aslinya, jangan dibungkus per baris
+      layoutW = Math.ceil(nW) + 2;
     } else {
-      const w = wide(); // signature teks biasa: biarkan membungkus, hanya perkecil jika ada yang meluap (gambar lebar)
+      const w = wide();
       if (w > avail + 1) layoutW = Math.ceil(w);
     }
-    if (!layoutW) { entry.last = sigKey(stage); return; } // sudah muat apa adanya
+    if (!layoutW) { entry.last = sigKey(stage); return; }
 
     stage.style.width = layoutW + 'px';
     const again = wide();
@@ -1655,13 +1782,12 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     const s = Math.max(0.3, raw);
     stage.style.transform = 'scale(' + s.toFixed(4) + ')';
     host.style.height = Math.ceil(stage.offsetHeight * s + padY) + 'px';
-    // sudah muat setelah diperkecil -> tanpa scrollbar; kalau masih lebih lebar (batas 30%) tetap bisa digeser
     host.style.overflowX = raw >= 0.3 ? 'hidden' : 'auto';
     host.style.overflowY = 'hidden';
     entry.last = sigKey(stage);
   }
 
-  // Kembalikan signature asli ke tempatnya (host dibuang) dan beri mode sederhana agar pasti terlihat
+  // Restores the original signature element when isolation fails
   function restoreSignature(entry) {
     try {
       if (entry.host.parentNode) {
@@ -1669,14 +1795,15 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
         entry.host.parentNode.removeChild(entry.host);
       }
       entry.sig.classList.add('btx-sigplain');
-    } catch (e) { /* abaikan */ }
+    } catch (e) {}
     const i = sigList.indexOf(entry);
     if (i > -1) sigList.splice(i, 1);
   }
+  // Fits a signature and falls back to the original on error
   function fitSignature(entry) {
     try { fitSignatureCore(entry); } catch (e) { restoreSignature(entry); }
   }
-  // Signature dianggap "hilang" bila kotaknya berukuran 0 atau terpotong (isi jauh lebih tinggi dari kotak)
+  // Checks whether a signature box is visible and not cropped
   function sigVisible(en) {
     if (!en.host.isConnected || !sigHasContent(en.sig)) return true;
     const hr = en.host.getBoundingClientRect();
@@ -1684,21 +1811,24 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     const sr = en.stage.getBoundingClientRect();
     return !(sr.height > 8 && hr.height < sr.height * 0.6);
   }
+  // Re-checks all signatures and restores any that disappeared
   function verifySignatures() {
     sigList.slice().forEach((en) => {
       if (sigVisible(en)) return;
-      fitSignature(en);                       // coba ukur ulang sekali
-      if (!sigVisible(en)) restoreSignature(en); // masih gagal -> tampilkan signature asli
+      fitSignature(en);
+      if (!sigVisible(en)) restoreSignature(en);
     });
   }
 
+  // Marks signatures for plain display on older browsers
   function plainSignatures() {
     document.querySelectorAll('#bodyarea div.signature').forEach((sig) => sig.classList.add('btx-sigplain'));
   }
 
+  // Isolates signatures in shadow DOM and scales them to fit
   function isolateSignatures() {
     if (!prefs.sig) return;
-    if (!canShadowIsolate()) { plainSignatures(); return; } // ponsel lawas: signature tampil apa adanya
+    if (!canShadowIsolate()) { plainSignatures(); return; }
     const css = siteStyles();
     if (!css.sheets) { plainSignatures(); return; }
     document.querySelectorAll('#bodyarea div.signature').forEach((sig) => {
@@ -1719,8 +1849,8 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
         root.append(stage);
         const entry = { host, root, stage, sig };
         sigList.push(entry);
-        root.addEventListener('load', () => fitSignature(entry), true); // gambar signature selesai dimuat
-      } catch (e) { /* biarkan signature asli bila gagal */ }
+        root.addEventListener('load', () => fitSignature(entry), true);
+      } catch (e) {}
     });
     if (!sigList.length) return;
     sigList.forEach(fitSignature);
@@ -1736,10 +1866,8 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     window.addEventListener('resize', refit);
     window.addEventListener('load', () => { refit(); setTimeout(verifySignatures, 900); });
     if (SIG_MOBILE && SIG_MOBILE.addEventListener) SIG_MOBILE.addEventListener('change', refit);
-    // ukur ulang beberapa kali untuk koneksi/ponsel lambat (gambar telat dimuat)
     [400, 1500, 3500].forEach((ms) => setTimeout(() => { sigList.forEach(fitSignature); verifySignatures(); }, ms));
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { refit(); setTimeout(verifySignatures, 300); });
-    // isi signature berubah ukuran (font/gambar telat dimuat) -> ukur ulang; berhenti setelah 6 detik
     let ticks = 0;
     const poll = setInterval(() => {
       sigList.forEach((en) => { if (en.last !== sigKey(en.stage)) fitSignature(en); });
@@ -1747,88 +1875,77 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
     }, 500);
   }
 
-    /* ------------------------------------------------------------------ *
- *  Garis dekoratif ═ ─ ━ yang terlalu panjang di layar sempit:
- *  potong jumlah karakternya sampai pas satu baris (tidak merusak
- *  konten asli — otomatis penuh lagi kalau layar dilebarkan).
- * ------------------------------------------------------------------ */
-function setupDividers() {
-  const RUN = /[\u2500-\u257F]{15,}/g;   // box-drawing, min. 15 char
-  const wraps = [];
+  // Shortens long decorative divider lines so they fit on narrow screens
+  function setupDividers() {
+    const RUN = /[\u2500-\u257F]{15,}/g;
+    const wraps = [];
 
-  document.querySelectorAll('#bodyarea .post').forEach((post) => {
-    const walker = document.createTreeWalker(post, NodeFilter.SHOW_TEXT);
-    const nodes = [];
-    let n;
-    while ((n = walker.nextNode())) {
-      if (!n.nodeValue || n.nodeValue.length < 15) continue;
-      const p = n.parentElement;
-      // jangan sentuh <pre>, <code>, signature, atau glowbox (biar tidak bentrok)
-      if (p && p.closest('pre, code, .code, .signature, .btx-glowbox')) continue;
-      RUN.lastIndex = 0;
-      if (!RUN.test(n.nodeValue)) continue;
-      nodes.push(n);
-    }
-
-    nodes.forEach((tn) => {
-      const text = tn.nodeValue;
-      const frag = document.createDocumentFragment();
-      let last = 0, m;
-      RUN.lastIndex = 0;
-      while ((m = RUN.exec(text))) {
-        if (m.index > last) frag.append(text.slice(last, m.index));
-        const span = document.createElement('span');
-        span.className = 'btx-line';
-        span.dataset.orig = m[0];        // simpan versi penuh
-        span.textContent = m[0];
-        frag.append(span);
-        wraps.push(span);
-        last = m.index + m[0].length;
+    document.querySelectorAll('#bodyarea .post').forEach((post) => {
+      const walker = document.createTreeWalker(post, NodeFilter.SHOW_TEXT);
+      const nodes = [];
+      let n;
+      while ((n = walker.nextNode())) {
+        if (!n.nodeValue || n.nodeValue.length < 15) continue;
+        const p = n.parentElement;
+        if (p && p.closest('pre, code, .code, .signature, .btx-glowbox')) continue;
+        RUN.lastIndex = 0;
+        if (!RUN.test(n.nodeValue)) continue;
+        nodes.push(n);
       }
-      if (last < text.length) frag.append(text.slice(last));
-      tn.parentNode.replaceChild(frag, tn);
+
+      nodes.forEach((tn) => {
+        const text = tn.nodeValue;
+        const frag = document.createDocumentFragment();
+        let last = 0, m;
+        RUN.lastIndex = 0;
+        while ((m = RUN.exec(text))) {
+          if (m.index > last) frag.append(text.slice(last, m.index));
+          const span = document.createElement('span');
+          span.className = 'btx-line';
+          span.dataset.orig = m[0];
+          span.textContent = m[0];
+          frag.append(span);
+          wraps.push(span);
+          last = m.index + m[0].length;
+        }
+        if (last < text.length) frag.append(text.slice(last));
+        tn.parentNode.replaceChild(frag, tn);
+      });
     });
-  });
 
-  if (!wraps.length) return;
+    if (!wraps.length) return;
 
-  const fit = () => {
-    wraps.forEach((span) => {
-      if (!span.isConnected) return;
-      const orig = span.dataset.orig;
-      if (!orig) return;
+    const fit = () => {
+      wraps.forEach((span) => {
+        if (!span.isConnected) return;
+        const orig = span.dataset.orig;
+        if (!orig) return;
 
-      // reset ke versi penuh dulu -> bisa re-evaluasi saat resize
-      span.textContent = orig;
-      span.style.display = 'inline-block';
-      span.style.whiteSpace = 'nowrap';
+        span.textContent = orig;
+        span.style.display = 'inline-block';
+        span.style.whiteSpace = 'nowrap';
 
-      const post = span.closest('.post') || span.parentElement;
-      if (!post) return;
+        const post = span.closest('.post') || span.parentElement;
+        if (!post) return;
 
-      const avail = post.clientWidth;
-      const w = span.offsetWidth;
-      if (w <= avail + 1) return;        // masih muat -> biarkan penuh
+        const avail = post.clientWidth;
+        const w = span.offsetWidth;
+        if (w <= avail + 1) return;
 
-      const charW = w / orig.length;
-      const maxChars = Math.max(5, Math.floor(avail / charW));
-      if (maxChars >= orig.length) return;
-      span.textContent = orig.slice(0, maxChars);   // potong sesuai lebar
-    });
-  };
+        const charW = w / orig.length;
+        const maxChars = Math.max(5, Math.floor(avail / charW));
+        if (maxChars >= orig.length) return;
+        span.textContent = orig.slice(0, maxChars);
+      });
+    };
 
-  requestAnimationFrame(fit);
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
-  let t = null;
-  window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(fit, 150); });
-  [500, 1500, 3000].forEach((ms) => setTimeout(fit, ms));
-}
+    requestAnimationFrame(fit);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+    let t = null;
+    window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(fit, 150); });
+    [500, 1500, 3000].forEach((ms) => setTimeout(fit, ms));
+  }
 
-  /* ------------------------------------------------------------------ *
-   *  Teks glow di isi post, mis. [glow][color=transparent]......[/color] JUDUL [color=transparent]......[/color][/glow]
-   *  Titik transparan sengaja dipakai sebagai "lebar" batang. Di layar sempit ia terbungkus jadi 2 baris,
-   *  jadi titiknya dirapatkan (letter-spacing negatif) agar tetap satu baris seperti di desktop.
-   * ------------------------------------------------------------------ */
   const glowList = [];
   const GLOW_SEL = '[style*="shadow" i], [style*="glow" i]';
   const isClear = (e) => {
@@ -1838,6 +1955,7 @@ function setupDividers() {
   const clearFillers = (t) => [t, ...t.querySelectorAll('*')].filter((e) =>
     isClear(e) && e.textContent.length > 0 && !(e.parentElement && t.contains(e.parentElement) && isClear(e.parentElement)));
 
+  // Fits one glow text block into the available width
   function fitGlow(en) {
     const { box, inner, fillers } = en;
     if (!box.isConnected) return;
@@ -1854,7 +1972,7 @@ function setupDividers() {
       if (ls > 0) fillers.forEach((f) => { f.style.letterSpacing = (-ls).toFixed(2) + 'px'; });
       w = inner.offsetWidth;
     }
-    if (w > avail + 1) { // masih lebih lebar -> perkecil seragam
+    if (w > avail + 1) {
       const s = Math.max(0.3, avail / w);
       inner.style.transform = 'scale(' + s.toFixed(4) + ')';
       box.style.height = Math.ceil(inner.offsetHeight * s) + 'px';
@@ -1862,6 +1980,7 @@ function setupDividers() {
     }
   }
 
+  // Finds glow text blocks in posts and keeps them on a single line
   function setupGlows() {
     try {
       const found = new Set();
@@ -1878,7 +1997,7 @@ function setupDividers() {
       const targets = all.filter((t) => !all.some((o) => o !== t && o.contains(t)) && !t.closest('.btx-glowbox'));
       targets.forEach((t) => {
         const fillers = clearFillers(t);
-        if (fillers.reduce((n, f) => n + f.textContent.length, 0) < 10) return; // bukan pola glow berisi titik transparan
+        if (fillers.reduce((n, f) => n + f.textContent.length, 0) < 10) return;
         const box = document.createElement('span');
         box.className = 'btx-glowbox';
         box.style.cssText = 'display:inline-block;max-width:100%;vertical-align:top;';
@@ -1889,9 +2008,9 @@ function setupDividers() {
         box.append(inner);
         glowList.push({ box, inner, fillers });
       });
-    } catch (e) { /* biarkan tampilan asli bila gagal */ }
+    } catch (e) {}
     if (!glowList.length) return;
-    const refit = () => glowList.forEach((en) => { try { fitGlow(en); } catch (e) { /* abaikan */ } });
+    const refit = () => glowList.forEach((en) => { try { fitGlow(en); } catch (e) {} });
     refit();
     let timer = null;
     const later = () => { clearTimeout(timer); timer = setTimeout(refit, 120); };
@@ -1901,16 +2020,15 @@ function setupDividers() {
     [300, 1200, 3000].forEach((ms) => setTimeout(refit, ms));
   }
 
+  // Builds the page footer
   function footer(extra) {
     return h('div', { class: 'btx-foot' }, extra, h('div', {}, L('footer')));
   }
 
-  /* ------------------------------------------------------------------ *
-   *  BitList: cari di bitlist.co, tampilkan hasilnya di halaman ini
-   * ------------------------------------------------------------------ */
   const BL_HOST = 'https://bitlist.co';
   const blUrl = (q, page) => BL_HOST + '/search?content=' + encodeURIComponent(q) + '&limit=20' + (page > 1 ? '&page=' + page : '');
 
+  // Requests a BitList page through the userscript manager
   function blRequest(url) {
     return new Promise((resolve, reject) => {
       if (typeof GM_xmlhttpRequest !== 'function') return reject(new Error('no GM_xmlhttpRequest'));
@@ -1923,8 +2041,8 @@ function setupDividers() {
     });
   }
 
-  // Bersihkan HTML post: hanya tag aman, tanpa atribut selain href
   const BL_TAGS = new Set(['B', 'I', 'U', 'S', 'BR', 'A', 'DIV', 'SPAN', 'UL', 'OL', 'LI', 'PRE', 'CODE', 'STRONG', 'EM', 'CENTER']);
+  // Sanitizes BitList post HTML to a safe subset of tags
   function blClean(node) {
     const out = document.createDocumentFragment();
     node.childNodes.forEach((n) => {
@@ -1951,6 +2069,7 @@ function setupDividers() {
     return out;
   }
 
+  // Parses a BitList search result page
   function blParse(html) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const genuine = /data-sveltekit|BitList/i.test(html);
@@ -1983,6 +2102,7 @@ function setupDividers() {
   }
 
   let blUi = null;
+  // Builds and returns the BitList results panel controller
   function blUI() {
     if (blUi) return blUi;
     const body = h('div', { class: 'btx-bl-body' });
@@ -2028,6 +2148,7 @@ function setupDividers() {
     return blUi;
   }
 
+  // Runs a BitList search and shows the results inline or in a new tab
   async function blSearch(q, page) {
     q = (q || '').trim(); page = page || 1;
     if (!q) return;
@@ -2041,20 +2162,19 @@ function setupDividers() {
       ui.render(data, q, page);
     } catch (e) {
       ui.error();
-      window.open(url, '_blank', 'noopener'); // bisa diblokir popup blocker; tombol "Buka di BitList" tetap ada
+      window.open(url, '_blank', 'noopener');
     }
   }
 
+  // Builds the standalone BitList search form
   function blForm() {
-    if (!prefs.bitlist) return null; // BitList dimatikan di pengaturan
+    if (!prefs.bitlist) return null;
     const input = h('input', { type: 'search', placeholder: L('blSearch'), 'aria-label': L('blSearch'), enterkeyhint: 'search', autocomplete: 'off' });
     return h('form', { class: 'btx-field', onsubmit: (e) => { e.preventDefault(); blSearch(input.value, 1); } },
       icon('search'), input, h('button', { class: 'btx-go', type: 'submit' }, 'BitList'));
   }
 
-  /* ------------------------------------------------------------------ *
-   *  Halaman: indeks
-   * ------------------------------------------------------------------ */
+  // Builds a collapsible category section with its board cards
   function categorySection(cat) {
     const isCol = !!collapsed[cat.title];
     const sec = h('section', { class: 'btx-cat' + (isCol ? ' collapsed' : '') },
@@ -2072,7 +2192,7 @@ function setupDividers() {
     return sec;
   }
 
-  /* Kartu user (avatar + info) - tampil di SEMUA halaman seperti header forum asli */
+  // Builds the user hero card shown on every page
   function heroEl(head, compact) {
     const initial = (head.user || '?').charAt(0).toUpperCase();
     return h('section', { class: 'btx-hero' + (compact ? ' compact' : '') },
@@ -2087,6 +2207,7 @@ function setupDividers() {
     );
   }
 
+  // Builds the index page layout
   function buildIndex(cats, head, info, sheet) {
     const hero = heroEl(head, false);
 
@@ -2148,12 +2269,10 @@ function setupDividers() {
     return h('div', { id: 'btx-app' }, makeTopbar(sheet), h('main', { class: 'btx-wrap' }, children), sheet.overlay, sheet.others);
   }
 
-  /* ------------------------------------------------------------------ *
-   *  Halaman: board
-   * ------------------------------------------------------------------ */
   const ACT_LABEL = L('actMap');
   const SORT_LABEL = L('sortMap');
 
+  // Builds one topic row for the board page
   function topicRow(t) {
     const tags = [];
     if (t.sticky) tags.push(h('span', { class: 'btx-tag' }, L('pinned')));
@@ -2176,6 +2295,7 @@ function setupDividers() {
     );
   }
 
+  // Builds the board page layout
   function buildBoard(bp, head, sheet) {
     const children = [heroEl(head, true), navEl(head)];
 
@@ -2233,9 +2353,7 @@ function setupDividers() {
     return h('div', { id: 'btx-app' }, makeTopbar(sheet), h('main', { class: 'btx-wrap' }, children), sheet.overlay, sheet.others);
   }
 
-  /* ------------------------------------------------------------------ *
-   *  Halaman lain: shell modern + skin untuk konten asli
-   * ------------------------------------------------------------------ */
+  // Builds the modern shell used above the original content of other pages
   function buildShell(head, sheet) {
     return h('div', { id: 'btx-app' }, makeTopbar(sheet),
       h('div', { class: 'btx-wrap btx-shellwrap' }, heroEl(head, true),
@@ -2244,9 +2362,7 @@ function setupDividers() {
       sheet.overlay, sheet.others);
   }
 
-  /* ------------------------------------------------------------------ *
-   *  Mulai
-   * ------------------------------------------------------------------ */
+  // Detects which kind of page is currently open
   function detectKind() {
     const q = location.search;
     if (!q || q === '?') return 'index';
@@ -2258,6 +2374,7 @@ function setupDividers() {
     return 'legacy';
   }
 
+  // Builds the modern UI for the current page
   function init() {
     if (document.getElementById('btx-app') || !document.getElementById('bodyarea')) return;
 
@@ -2294,7 +2411,6 @@ function setupDividers() {
       const navTd = [...document.querySelectorAll('td.maintab_back, td.maintab_active_back')].find((td) => !td.closest('#bodyarea'));
       if (navTd && navTd.closest('table')) navTd.closest('table').classList.add('btx-hide');
       document.body.prepend(buildShell(head, sheet));
-      // tiap langkah dibungkus sendiri: kalau satu gagal di ponsel lawas, yang lain tetap jalan
       safe(upgradePagers);
       safe(joinThreadHead);
       safe(restylePosts);
@@ -2307,18 +2423,17 @@ function setupDividers() {
     safe(centerPagers);
   }
 
+  // Starts the script and always reveals the page afterwards
   function start() {
     try {
       init();
     } catch (e) {
-      if (window.console) console.error('[btx] init gagal, memakai tampilan asli:', e);
+      if (window.console) console.error('[btx] init failed, using original UI:', e);
     } finally {
-      // tampilkan halaman SETELAH UI modern selesai dibangun (atau langsung bila gagal)
       unboot();
     }
   }
 
-  // Script jalan di document-start: tunggu DOM selesai di-parse sebelum membangun UI
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
 })();
