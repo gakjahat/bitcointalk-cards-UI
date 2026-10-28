@@ -4393,12 +4393,12 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
   const ACT_LABEL = L('actMap');
   const SORT_LABEL = L('sortMap');
 
-  // Builds one topic row for the board page with a clear lock tag
+  // Builds one topic row for the board page with emoji tags for locked, sticky and poll
   function topicRow(t) {
     const tags = [];
     if (t.locked) tags.push(h('span', { class: 'btx-tag lock' }, '\uD83D\uDD12 ' + L('locked')));
-    if (t.sticky) tags.push(h('span', { class: 'btx-tag' }, L('pinned')));
-    if (t.poll) tags.push(h('span', { class: 'btx-tag' }, L('poll')));
+    if (t.sticky) tags.push(h('span', { class: 'btx-tag' }, '\uD83D\uDCCC ' + L('pinned')));
+    if (t.poll) tags.push(h('span', { class: 'btx-tag' }, '\uD83D\uDCCA ' + L('poll')));
     if (t.unread) tags.push(h('a', { class: 'btx-tag new', href: t.newHref || t.href }, L('newTag')));
 
     return h('article', { class: 'btx-topic' + (t.sticky ? ' sticky' : '') + (t.locked ? ' locked' : '') + (t.unread ? ' unread' : ''), 'data-heat': t.heat, 'data-s': (t.title + ' ' + t.starter).toLowerCase() },
