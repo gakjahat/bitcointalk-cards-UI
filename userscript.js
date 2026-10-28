@@ -538,9 +538,10 @@
     return items.length ? items : null;
   }
 
-  // Parses the topic rows of a board page
+  // Parses the topic rows of a board page and detects locked and sticky topics from visible icons and status icons
   function parseTopics() {
     const rows = [];
+    const visible = (img) => !!img && !/display\s*:\s*none/i.test(img.getAttribute('style') || '');
     document.querySelectorAll('#bodyarea tr').forEach((tr) => {
       const span = tr.querySelector('span[id^="msg_"]');
       if (!span || tr.querySelector('tr')) return;
@@ -548,6 +549,7 @@
       if (!a || tr.children.length < 7) return;
       const tds = tr.children;
       const ic = (tds[0].querySelector('img') || {}).src || '';
+      const ic2 = (tds[1].querySelector('img') || {}).src || '';
       const sub = tds[2];
       const newA = sub.querySelector('a[id^="newicon"]');
       const st = tds[3].querySelector('a');
@@ -559,8 +561,8 @@
       rows.push({
         title: txt(a),
         href: a.href,
-        sticky: !!sub.querySelector('img[id^="stickyicon"]'),
-        locked: !!sub.querySelector('img[id^="lockicon"]'),
+        sticky: visible(sub.querySelector('img[id^="stickyicon"]')) || /sticky/i.test(ic + ' ' + ic2),
+        locked: visible(sub.querySelector('img[id^="lockicon"]')) || /lock/i.test(ic + ' ' + ic2),
         poll: /poll/.test(ic),
         heat: /veryhot/.test(ic) ? 2 : /hot/.test(ic) ? 1 : 0,
         unread: !!newA,
@@ -2330,6 +2332,13 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
     grid-template-columns:minmax(0,1fr) !important;
     grid-template-areas:"nav" "acts" "pg" !important}
 }
+
+/* ==== Tag Locked pada daftar topik ==== */
+.btx-tag.lock{background:color-mix(in srgb,#c0392b 14%,var(--surface2));color:#c0392b !important;
+  border:1px solid color-mix(in srgb,#c0392b 35%,transparent)}
+:root[data-theme="dark"] .btx-tag.lock{color:#f87171 !important;
+  background:color-mix(in srgb,#f87171 14%,var(--surface2));border-color:color-mix(in srgb,#f87171 35%,transparent)}
+.btx-topic.locked .btx-t-title{opacity:.85}
 
 `;
 
@@ -4384,15 +4393,15 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
   const ACT_LABEL = L('actMap');
   const SORT_LABEL = L('sortMap');
 
-  // Builds one topic row for the board page
+  // Builds one topic row for the board page with a clear lock tag
   function topicRow(t) {
     const tags = [];
+    if (t.locked) tags.push(h('span', { class: 'btx-tag lock' }, '\uD83D\uDD12 ' + L('locked')));
     if (t.sticky) tags.push(h('span', { class: 'btx-tag' }, L('pinned')));
-    if (t.locked) tags.push(h('span', { class: 'btx-tag' }, L('locked')));
     if (t.poll) tags.push(h('span', { class: 'btx-tag' }, L('poll')));
     if (t.unread) tags.push(h('a', { class: 'btx-tag new', href: t.newHref || t.href }, L('newTag')));
 
-    return h('article', { class: 'btx-topic' + (t.sticky ? ' sticky' : '') + (t.unread ? ' unread' : ''), 'data-heat': t.heat, 'data-s': (t.title + ' ' + t.starter).toLowerCase() },
+    return h('article', { class: 'btx-topic' + (t.sticky ? ' sticky' : '') + (t.locked ? ' locked' : '') + (t.unread ? ' unread' : ''), 'data-heat': t.heat, 'data-s': (t.title + ' ' + t.starter).toLowerCase() },
       h('div', { class: 'btx-t-main' },
         h('a', { class: 'btx-t-title', href: t.href }, t.title),
         tags.length > 0 && h('div', { class: 'btx-tags' }, tags),
