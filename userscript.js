@@ -1,7 +1,9 @@
 // ==UserScript==
 // @name         Bitcointalk Modern UI (Mobile Friendly)
 // @namespace    https://bitcointalk.org/
-// @version      1.5.6
+// @match        https://talkimg.com/*
+// @match        https://www.talkimg.com/*
+// @version      1.5.8
 // @description  Modern, mobile-friendly Bitcointalk UI: index, boards, neat thread posts (uncropped avatars, compact poster card on mobile), a light/dark skin for every other page, and BitList archive search shown right on the page. Language: auto / English / Indonesia.
 // @author       Gak Jahat
 // @match        https://bitcointalk.org/*
@@ -11,6 +13,7 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_xmlhttpRequest
 // @connect      bitlist.co
+// @connect      update.greasyfork.org
 // @license      Public/Free
 // @downloadURL https://update.greasyfork.org/scripts/601150/Bitcointalk%20Modern%20UI%20%28Mobile%20Friendly%29.user.js
 // @updateURL https://update.greasyfork.org/scripts/601150/Bitcointalk%20Modern%20UI%20%28Mobile%20Friendly%29.meta.js
@@ -18,6 +21,31 @@
 
 (function () {
   'use strict';
+
+
+  // TalkImg page: make the "insert" and "copy" buttons bold and styled like the forum buttons
+  if (/(^|\.)talkimg\.com$/i.test(location.hostname)) {
+    const tkiCss = '' +
+      '.switch-combo{display:flex !important;flex-wrap:wrap !important;justify-content:flex-end !important;' +
+      'align-items:center !important;gap:8px !important}' +
+      '.switch-combo.soft-hidden{display:none !important}' +
+      '.switch-combo textarea{flex:0 0 100% !important;width:100% !important;margin:0 !important}' +
+      '.switch-combo .input-action{' +
+      'position:static !important;top:auto !important;right:auto !important;bottom:auto !important;left:auto !important;' +
+      'float:none !important;margin:0 !important;width:auto !important;height:auto !important;' +
+      'white-space:nowrap !important;font-size:12px !important;font-weight:700 !important;line-height:1.2 !important;' +
+      'padding:5px 14px !important;border-radius:10px !important;cursor:pointer;' +
+      'color:#2563eb !important;background:#e3ecfd !important;' +
+      'border:1px solid rgba(37,99,235,.45) !important;box-shadow:none !important;text-shadow:none !important}' +
+      '.switch-combo .input-action[data-action="openerPostMessage"]{order:1}' +
+      '.switch-combo .input-action[data-action="copy"]{order:2}' +
+      '.switch-combo .input-action:hover{' +
+      'background:#2563eb !important;color:#ffffff !important;border-color:transparent !important}';
+    const tkiStyle = document.createElement('style');
+    tkiStyle.textContent = tkiCss;
+    (document.head || document.documentElement).appendChild(tkiStyle);
+    return;
+  }
 
   try {
     if (!Element.prototype.replaceChildren) {
@@ -80,6 +108,11 @@
       sigOriginal: 'Keep signatures in original look',
       pinfoRebuild: 'Rebuild poster info (turn off if another script conflicts)',
       pabbr: 'Abbreviate poster stats to initials on mobile (tap for full name)',
+      pfOnline: 'Online', pfOffline: 'Offline', pfMessage: 'Message', pfShowPosts: 'Show posts',
+      pfPosts: 'Posts', pfActivity: 'Activity', pfMerit: 'Merit', pfTrust: 'Trust',
+      pfRegistered: 'Registered', pfLastActive: 'Last active', pfLocalTime: 'Local time', pfWebsite: 'Website', pfGender: 'Gender',
+      pfAge: 'Age', pfLocation: 'Location', pfEmail: 'Email', pfSignature: 'Signature', pfSettings: 'Settings',
+      pfLinksTitle: 'More from this member', pfLastPosts: 'Last posts', pfTopics: 'Topics started', pfStats: 'General statistics',
       blSearch: 'Search BitList archive\u2026', blTitle: 'BitList results', blOpen: 'Open in BitList',
       blEnable: 'Enable BitList search', blMenu: 'BitList search: ',
       blInline: 'Show BitList results on this page (off = new tab)', blLoading: 'Loading\u2026',
@@ -87,7 +120,9 @@
       blNone: 'No results.', blDeleted: 'Deleted', blOf: 'of', blResults: 'results',
       srcForum: 'Forum', srcBoard: 'This board', srcBitlist: 'BitList',
         fontSize: 'Font size', fontFamily: 'Font', fontDefault: 'Default', fontSans: 'Sans', fontSerif: 'Serif', fontMono: 'Mono',
-      fontTitle: 'Font', fontTarget: 'Apply font to', fxAll: 'All', fxUi: 'Menu & buttons', fxContent: 'Thread content', fxCard: 'Board cards',
+      fontTitle: 'Font', fontTarget: 'Apply font to', fxAll: 'All', fxUi: 'Menu & buttons', fxContent: 'Thread & Content', fxCard: 'Board cards',
+              colors: 'Colors', textColor: 'Text color', customColor: 'Custom color', colorDefault: 'Theme default',
+              copy: 'Copy', copied: 'Copied', copyFail: 'Failed',
       actMap: {}, sortMap: {}
     },
     id: {
@@ -110,15 +145,22 @@
       sigOriginal: 'Signature tampil seperti aslinya',
       pinfoRebuild: 'Tata ulang info poster (matikan jika bentrok dengan script lain)',
       pabbr: 'Singkat statistik poster jadi inisial di mobile (tap untuk nama lengkap)',
+      pfOnline: 'Online', pfOffline: 'Offline', pfMessage: 'Kirim pesan', pfShowPosts: 'Lihat posting',
+      pfPosts: 'Posting', pfActivity: 'Aktivitas', pfMerit: 'Merit', pfTrust: 'Trust',
+      pfRegistered: 'Terdaftar', pfLastActive: 'Terakhir aktif', pfLocalTime: 'Waktu lokal', pfWebsite: 'Website', pfGender: 'Jenis kelamin',
+      pfAge: 'Usia', pfLocation: 'Lokasi', pfEmail: 'Email', pfSignature: 'Signature', pfSettings: 'Pengaturan',
+      pfLinksTitle: 'Lainnya dari member ini', pfLastPosts: 'Posting terakhir', pfTopics: 'Topik yang dibuat', pfStats: 'Statistik umum',
       blSearch: 'Cari di arsip BitList\u2026', blTitle: 'Hasil BitList', blOpen: 'Buka di BitList',
       blEnable: 'Aktifkan pencarian BitList', blMenu: 'Pencarian BitList: ',
       blInline: 'Tampilkan hasil BitList di halaman ini (mati = tab baru)', blLoading: 'Memuat\u2026',
       blFail: 'Hasil BitList tidak bisa dimuat di sini. Pakai tombol di atas untuk membuka BitList.',
       blNone: 'Tidak ada hasil.', blDeleted: 'Dihapus', blOf: 'dari', blResults: 'hasil',
       srcForum: 'Forum', srcBoard: 'Board ini', srcBitlist: 'BitList',
-        fontSize: 'Ukuran font', fontFamily: 'Jenis font', fontDefault: 'Bawaan', fontSans: 'Sans', fontSerif: 'Serif', fontMono: 'Mono',
-      fontTitle: 'Font', fontTarget: 'Terapkan font ke', fxAll: 'Semua', fxUi: 'Menu & tombol', fxContent: 'Isi thread', fxCard: 'Kartu board',
-      actMap: { 'New Topic': 'Topik baru', 'Post new poll': 'Polling baru', 'Mark Read': 'Tandai dibaca', 'Notify': 'Notifikasi' },
+      fontSize: 'Ukuran font', fontFamily: 'Jenis font', fontDefault: 'Bawaan', fontSans: 'Sans', fontSerif: 'Serif', fontMono: 'Mono',
+      fontTitle: 'Font', fontTarget: 'Terapkan font ke', fxAll: 'Semua', fxUi: 'Menu & tombol', fxContent: 'Thread & Konten', fxCard: 'Kartu board',
+      colors: 'Warna', textColor: 'Warna teks', customColor: 'Warna kustom', colorDefault: 'Bawaan tema',
+      copy: 'Salin', copied: 'Tersalin', copyFail: 'Gagal',
+          actMap: { 'New Topic': 'Topik baru', 'Post new poll': 'Polling baru', 'Mark Read': 'Tandai dibaca', 'Notify': 'Notifikasi', 'Unnotify': 'Matikan notifikasi', 'Un-notify': 'Matikan notifikasi' },
       sortMap: { 'Subject': 'Judul', 'Started by': 'Pembuat', 'Replies': 'Balasan', 'Views': 'Dilihat', 'Last post': 'Terakhir' }
     }
   };
@@ -139,7 +181,121 @@
     });
   }
   if (!store.get('enabled', true)) return;
+    
+  const UPD_META_URL = 'https://update.greasyfork.org/scripts/601150/Bitcointalk%20Modern%20UI%20%28Mobile%20Friendly%29.meta.js';
+  const UPD_INSTALL_URL = 'https://update.greasyfork.org/scripts/601150/Bitcointalk%20Modern%20UI%20%28Mobile%20Friendly%29.user.js';
+  const UPD_INTERVAL = 6 * 60 * 60 * 1000;
 
+  // Compares two dotted version strings and returns 1, -1 or 0
+  function updCompare(a, b) {
+    const x = String(a).split('.').map((n) => parseInt(n, 10) || 0);
+    const y = String(b).split('.').map((n) => parseInt(n, 10) || 0);
+    const len = Math.max(x.length, y.length);
+    for (let i = 0; i < len; i++) {
+      const p = x[i] || 0;
+      const q = y[i] || 0;
+      if (p > q) return 1;
+      if (p < q) return -1;
+    }
+    return 0;
+  }
+
+  // Fetches the remote metadata text through the userscript manager
+  function updFetch() {
+    return new Promise((resolve, reject) => {
+      if (typeof GM_xmlhttpRequest !== 'function') return reject(new Error('no GM_xmlhttpRequest'));
+      GM_xmlhttpRequest({
+        method: 'GET',
+        url: UPD_META_URL + '?t=' + Date.now(),
+        timeout: 15000,
+        onload: (r) => (r.status >= 200 && r.status < 300) ? resolve(r.responseText) : reject(new Error('HTTP ' + r.status)),
+        onerror: () => reject(new Error('network')),
+        ontimeout: () => reject(new Error('timeout'))
+      });
+    });
+  }
+
+  // Shows the small update popup at the bottom of the page
+  function updShow(latest) {
+    const host = document.documentElement;
+    if (!host || document.getElementById('btx-upd')) return;
+    const id = (typeof LANG !== 'undefined' && LANG === 'id');
+    const css = document.createElement('style');
+    css.textContent =
+      '#btx-upd{position:fixed;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);' +
+      'z-index:2147483000;display:flex !important;align-items:center;gap:10px;box-sizing:border-box;max-width:calc(100vw - 24px);' +
+      'padding:9px 10px 9px 14px;border-radius:14px;background:var(--surface,#ffffff);color:var(--text,#000000);' +
+      'border:1px solid var(--accent,#476C8E);box-shadow:0 8px 28px rgba(0,0,0,.28);' +
+      'font:600 13px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;animation:btxUpd .25s ease-out}' +
+      '#btx-upd .t{min-width:0;overflow-wrap:anywhere}' +
+      '#btx-upd .t small{display:block;font-weight:500;color:var(--muted,#666666);font-size:11.5px}' +
+      '#btx-upd a{flex:none;display:inline-flex;align-items:center;height:30px;padding:0 14px;border-radius:10px;' +
+      'background:var(--accent,#476C8E);color:var(--on-accent,#ffffff) !important;font-weight:700;font-size:12.5px;text-decoration:none}' +
+      '#btx-upd button{flex:none;width:28px;height:28px;border:0;border-radius:8px;background:transparent;color:var(--muted,#666666);' +
+      'font-size:18px;line-height:1;cursor:pointer;padding:0}' +
+      '#btx-upd button:hover{background:var(--surface2,#ECEDF3)}' +
+      '@keyframes btxUpd{from{transform:translate(-50%,12px);opacity:0}to{transform:translate(-50%,0);opacity:1}}';
+    const box = document.createElement('div');
+    box.id = 'btx-upd';
+    box.setAttribute('role', 'status');
+    const label = document.createElement('div');
+    label.className = 't';
+    label.textContent = id ? 'Versi baru tersedia' : 'New version available';
+    const sub = document.createElement('small');
+    sub.textContent = 'v' + latest;
+    label.appendChild(sub);
+    const go = document.createElement('a');
+    go.href = UPD_INSTALL_URL;
+    go.target = '_blank';
+    go.rel = 'noopener';
+    go.textContent = id ? 'Perbarui' : 'Update';
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.setAttribute('aria-label', id ? 'Tutup' : 'Close');
+    close.textContent = '\u00D7';
+    const dismiss = () => {
+      store.set('updSeen', latest);
+      box.remove();
+      css.remove();
+    };
+    go.addEventListener('click', () => { setTimeout(dismiss, 400); });
+    close.addEventListener('click', dismiss);
+    box.append(label, go, close);
+    host.appendChild(css);
+    host.appendChild(box);
+  }
+
+  // Checks for a newer version and shows the popup when one exists
+  async function updCheck() {
+    const current = (typeof GM_info === 'object' && GM_info && GM_info.script && GM_info.script.version) || '0';
+    const now = Date.now();
+    let latest = store.get('updLatest', '');
+    if (!latest || now - store.get('updLast', 0) > UPD_INTERVAL) {
+      try {
+        const m = (await updFetch()).match(/@version\s+(\S+)/);
+        if (m) {
+          latest = m[1];
+          store.set('updLatest', latest);
+        }
+        store.set('updLast', now);
+      } catch (e) {
+        if (window.console) console.warn('[btx] update check failed:', e && e.message);
+      }
+    }
+    if (!latest || updCompare(latest, current) <= 0) return;
+    if (store.get('updSeen', '') === latest) return;
+    updShow(latest);
+  }
+
+  // Starts the update check once the page is ready
+  function updStart() {
+    if (window.top !== window.self) return;
+    const run = () => { setTimeout(() => { safe(updCheck); }, 1500); };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+    else run();
+  }
+  updStart();
+    
   const BOOT_ID = 'btx-boot-style';
   safe(() => {
     const t = store.get('theme', 'auto');
@@ -195,6 +351,7 @@
   }
 
   const ICON = {
+    next: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>',
     sun: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
     moon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>',
     gear: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
@@ -579,6 +736,18 @@ div.btx-avatar{display:grid;place-items:center;width:64px;height:64px;font-weigh
 .btx-nav a{flex:none;padding:8px 15px;border-radius:12px;font-size:14px;font-weight:500;color:var(--muted) !important;
   background:var(--surface);border:1px solid var(--border)}
 .btx-nav a.on{background:var(--accent);color:var(--on-accent) !important;border-color:transparent;font-weight:600}
+
+@media(max-width:760px){
+  .btx-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;width:100%;margin:12px 0 0;padding:0}
+  .btx-nav a{flex:none;width:100%;height:40px;min-height:40px;display:flex;align-items:center;justify-content:center;
+    padding:0 4px;font-size:12.5px;font-weight:500;text-align:center;box-sizing:border-box;border-radius:10px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .btx-nav a.on{font-weight:600}
+}
+@media(max-width:420px){
+  .btx-nav{gap:6px}
+  .btx-nav a{font-size:11.5px;height:38px;min-height:38px;border-radius:8px;padding:0 2px}
+}
 
 .btx-tools{display:grid;gap:10px;margin-top:12px}
 .btx-tools{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
@@ -1034,7 +1203,9 @@ body.btx-full :is(.btx-cat,.btx-info,.btx-topics,.btx-news,.btx-sec-h,.btx-wrap 
 :root[data-fcd="1"] :is(.btx-cat,.btx-grid,.btx-info,.btx-bhead,.btx-topics,.btx-sec-h,.btx-news) *{font-family:var(--btx-ff-cd) !important}
 
 :root[data-fct="1"] body.btx-legacy #bodyarea .post,
-:root[data-fct="1"] body.btx-legacy #bodyarea .post *{font-family:var(--btx-ff-ct) !important}
+:root[data-fct="1"] body.btx-legacy #bodyarea .post *,
+:root[data-fct="1"] body.btx-legacy #bodyarea .btx-pf,
+:root[data-fct="1"] body.btx-legacy #bodyarea .btx-pf *{font-family:var(--btx-ff-ct) !important}
 :root[data-fct="1"] body.btx-legacy #bodyarea .post :is(pre,code,.code,.codeheader),
 :root[data-fct="1"] body.btx-legacy #bodyarea .post :is(pre,code,.code,.codeheader) *{font-family:ui-monospace,Menlo,Consolas,monospace !important}
 
@@ -1131,6 +1302,1024 @@ body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
     }
 }
 
+
+
+body.btx-legacy #bodyarea .btx-pf{display:grid;gap:12px;max-width:1180px;margin:0 auto;min-width:0}
+body.btx-legacy #bodyarea .btx-pf > div{display:grid;gap:12px;min-width:0;align-content:start}
+@media(min-width:900px){
+  body.btx-legacy #bodyarea .btx-pf{grid-template-columns:minmax(0,1fr) 340px;grid-template-areas:"main side" "sig sig";gap:16px;align-items:start}
+  body.btx-legacy #bodyarea .btx-pf > .btx-pf-main{grid-area:main}
+  body.btx-legacy #bodyarea .btx-pf > .btx-pf-side{grid-area:side}
+  body.btx-legacy #bodyarea .btx-pf > .btx-pf-sig{grid-area:sig}
+}
+body.btx-legacy #bodyarea .btx-pf-card,
+body.btx-legacy #bodyarea .btx-pf-hero{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);min-width:0}
+body.btx-legacy #bodyarea .btx-pf-card{padding:4px 14px}
+body.btx-legacy #bodyarea .btx-pf-hero{display:flex;flex-wrap:wrap;align-items:flex-start;gap:14px;padding:14px}
+body.btx-legacy #bodyarea .btx-pf-av{flex:none;max-width:112px}
+body.btx-legacy #bodyarea .btx-pf-av img{display:block;max-width:100% !important;width:auto !important;height:auto !important;max-height:160px;
+  object-fit:contain;border-radius:12px;box-shadow:0 0 0 1px var(--border),0 6px 16px rgba(0,0,0,.12)}
+body.btx-legacy #bodyarea .btx-pf-id{flex:1 1 140px;min-width:0}
+body.btx-legacy #bodyarea .btx-pf-name{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em;line-height:1.2;overflow-wrap:anywhere;color:var(--text)}
+body.btx-legacy #bodyarea .btx-pf-rank{margin-top:2px;font-size:14px;color:var(--muted)}
+body.btx-legacy #bodyarea .btx-pf-status{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13.5px;color:var(--muted)}
+body.btx-legacy #bodyarea .btx-pf-status .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+body.btx-legacy #bodyarea .btx-pf-status .dot.on{background:#22c55e}
+body.btx-legacy #bodyarea .btx-pf-text{margin-top:8px;font-size:14px;overflow-wrap:anywhere}
+body.btx-legacy #bodyarea .btx-pf-acts{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:8px}
+body.btx-legacy #bodyarea .btx-pf-acts a{flex:1 1 130px;justify-content:center;text-decoration:none;font-size:15px;min-height:42px}
+
+body.btx-legacy #bodyarea .btx-pf-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+@media(min-width:560px){body.btx-legacy #bodyarea .btx-pf-tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+body.btx-legacy #bodyarea .btx-pf-tile{display:block;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
+  padding:10px 12px;text-decoration:none;color:var(--text)}
+body.btx-legacy #bodyarea .btx-pf-tile small{display:block;font-size:13px;color:var(--muted)}
+body.btx-legacy #bodyarea .btx-pf-tile .val{display:block;margin-top:2px;font-size:22px;font-weight:700;line-height:1.25;letter-spacing:-.01em;overflow-wrap:anywhere}
+body.btx-legacy #bodyarea .btx-pf-tile.trust .val{margin-top:5px;font-size:17px}
+body.btx-legacy #bodyarea .btx-pf-tile .trustscore{color:var(--text) !important}
+
+body.btx-legacy #bodyarea .btx-pf-row{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--border);font-size:15px;min-width:0}
+body.btx-legacy #bodyarea .btx-pf-row:first-child{border-top:0}
+body.btx-legacy #bodyarea .btx-pf-row .k{flex:none;width:112px;color:var(--muted)}
+body.btx-legacy #bodyarea .btx-pf-row .v{flex:1;min-width:0;text-align:right;overflow-wrap:anywhere}
+body.btx-legacy #bodyarea .btx-pf-row .trustscore{color:var(--text) !important}
+body.btx-legacy #bodyarea .btx-pf-h{margin:0;padding:12px 0 6px;font-size:14px;font-weight:700;color:var(--muted)}
+body.btx-legacy #bodyarea .btx-pf-sig{padding:0 2px 4px}
+body.btx-legacy #bodyarea .btx-pf-sig .btx-pf-h{padding:12px 14px 6px}
+body.btx-legacy #bodyarea .btx-pf-link{display:flex;align-items:center;gap:10px;min-height:48px;padding:10px 0;border-top:1px solid var(--border);
+  font-size:15px;text-decoration:none;color:var(--text)}
+body.btx-legacy #bodyarea .btx-pf-h + .btx-pf-link{border-top:0}
+body.btx-legacy #bodyarea .btx-pf-link .t{flex:1;min-width:0;overflow-wrap:anywhere}
+body.btx-legacy #bodyarea .btx-pf-link .btx-ico{margin-left:auto;color:var(--muted)}
+
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pf-layout,
+  body.btx-legacy #bodyarea .btx-pf-layout > tbody,
+  body.btx-legacy #bodyarea .btx-pf-layout > tbody > tr,
+  body.btx-legacy #bodyarea .btx-pf-layout > tbody > tr > td{display:block;width:100% !important;box-sizing:border-box}
+  body.btx-legacy #bodyarea .btx-pf-av{max-width:104px}
+  body.btx-legacy #bodyarea .btx-pf-layout > tbody > tr > td:first-child > table{width:100% !important}
+}
+
+/* ==== Search page + Show Thread safety (mobile) ==== */
+@media(max-width:760px){
+  body.btx-legacy #bodyarea #searchform,
+  body.btx-legacy #bodyarea #searchform > table,
+  body.btx-legacy #bodyarea #searchform > table > tbody,
+  body.btx-legacy #bodyarea #searchform > table > tbody > tr{display:block;width:100% !important;max-width:100% !important;box-sizing:border-box}
+  body.btx-legacy #bodyarea #searchform > table > tbody > tr > td{display:block;width:100% !important;max-width:100% !important;box-sizing:border-box;padding:4px 0 !important;border:0}
+  body.btx-legacy #bodyarea #searchform > table > tbody > tr > td:empty{display:none}
+  body.btx-legacy #bodyarea #searchform input[type="text"],
+  body.btx-legacy #bodyarea #searchform select{width:100% !important;max-width:100% !important;box-sizing:border-box;font-size:16px}
+  body.btx-legacy #bodyarea #searchform div[style*="float"],
+  body.btx-legacy #bodyarea #searchform div[style*="width: 45%"]{float:none !important;width:100% !important;max-width:100% !important;margin:8px 0 !important}
+  body.btx-legacy #bodyarea #searchform fieldset{padding:8px !important;margin:8px 0 !important;max-width:100% !important;box-sizing:border-box}
+  body.btx-legacy #bodyarea #searchBoardsExpand,
+  body.btx-legacy #bodyarea #searchBoardsExpand > tbody,
+  body.btx-legacy #bodyarea #searchBoardsExpand > tbody > tr{display:block;width:100% !important;box-sizing:border-box}
+  body.btx-legacy #bodyarea #searchBoardsExpand > tbody > tr > td{display:block;width:100% !important;max-width:100% !important;box-sizing:border-box}
+  body.btx-legacy #bodyarea form[action*="google"] input[name="q"]{width:100% !important;box-sizing:border-box;font-size:16px}
+  body.btx-legacy #bodyarea form[action*="google"] input[type="submit"]{margin-top:6px}
+  body.btx-legacy #bodyarea table.tborder{max-width:100% !important}
+  body.btx-legacy #bodyarea #quickModForm > table.bordercolor{width:100% !important;max-width:100% !important}
+  body.btx-legacy #bodyarea table.btx-thead{width:100% !important;max-width:100% !important}
+  body.btx-legacy #bodyarea #searchform div[style*="text-align: left"]{text-align:left !important}
+}
+
+/* ==== Modern Profile: Show Posts / Topics Started (desktop + mobile) ==== */
+body.btx-legacy #bodyarea .btx-pp{
+  display:grid;grid-template-columns:minmax(0,1fr);gap:14px;
+  width:100%;max-width:1180px;margin:0 auto;padding-top:6px;min-width:0;box-sizing:border-box}
+@media(min-width:900px){
+  body.btx-legacy #bodyarea .btx-pp{grid-template-columns:minmax(0,1fr) 280px;gap:18px;align-items:start}
+  body.btx-legacy #bodyarea .btx-pp-side{position:sticky;top:72px}
+}
+body.btx-legacy #bodyarea .btx-pp-main{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;min-width:0;align-content:start}
+body.btx-legacy #bodyarea .btx-pp-side{display:grid;gap:12px;min-width:0;align-content:start}
+body.btx-legacy #bodyarea .btx-pp-h1{margin:2px 4px 0;font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.25;color:var(--text)}
+body.btx-legacy #bodyarea .btx-pp-list{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;min-width:0}
+body.btx-legacy #bodyarea .btx-pp-main > .btx-pager{margin:0}
+
+body.btx-legacy #bodyarea .btx-pp-side .btx-pf-link.on{
+  background:color-mix(in srgb,var(--accent) 14%,transparent);border-radius:10px;
+  padding-left:10px;padding-right:10px;font-weight:600;color:var(--accent) !important;border-top-color:transparent}
+body.btx-legacy #bodyarea .btx-pp-side .btx-pf-link.on .btx-ico{color:var(--accent)}
+
+/* kartu */
+body.btx-legacy #bodyarea .btx-pp-item{
+  display:flex;flex-direction:column;min-width:0;width:100%;max-width:100%;box-sizing:border-box;overflow:hidden;
+  background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent);
+  border-radius:var(--r-lg);box-shadow:var(--shadow);transition:box-shadow .15s,transform .15s}
+@media(hover:hover){
+  body.btx-legacy #bodyarea .btx-pp-item:hover{transform:translateY(-1px);
+    box-shadow:0 2px 4px rgba(0,0,0,.06),0 10px 26px rgba(0,0,0,.10)}
+}
+body.btx-legacy #bodyarea .btx-pp-head{
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:10px 16px;
+  background:color-mix(in srgb,var(--accent) 9%,var(--surface));border-bottom:1px solid var(--border)}
+body.btx-legacy #bodyarea .btx-pp-num{
+  flex:none;min-width:28px;height:28px;padding:0 8px;border-radius:9px;display:grid;place-items:center;
+  background:var(--accent);color:var(--on-accent);font-size:12.5px;font-weight:700}
+body.btx-legacy #bodyarea .btx-pp-crumbs{
+  display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;flex:1 1 200px;min-width:0;font-size:12.5px;color:var(--muted)}
+body.btx-legacy #bodyarea .btx-pp-crumbs a{color:var(--muted) !important;overflow-wrap:anywhere;text-decoration:none}
+body.btx-legacy #bodyarea .btx-pp-crumbs a:hover{color:var(--accent) !important}
+body.btx-legacy #bodyarea .btx-pp-crumbs .sep{opacity:.5}
+body.btx-legacy #bodyarea .btx-pp-date{flex:none;margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap}
+body.btx-legacy #bodyarea .btx-pp-title{
+  display:block;padding:14px 16px 4px;font-size:17px;font-weight:700;line-height:1.35;letter-spacing:-.01em;
+  overflow-wrap:anywhere;color:var(--text) !important;text-decoration:none}
+body.btx-legacy #bodyarea .btx-pp-title:hover{color:var(--accent) !important}
+
+/* isi post: sama seperti di thread (JS yang merapikan glow & garis panjang) */
+body.btx-legacy #bodyarea .btx-pp-body{
+  flex:1;min-width:0;max-width:100%;box-sizing:border-box;padding:8px 16px 16px;
+  font-size:14px;line-height:1.6;overflow-x:auto}
+body.btx-legacy #bodyarea .btx-pp-body .post{max-width:100%;overflow-wrap:anywhere}
+body.btx-legacy #bodyarea .btx-pp-body .post img{max-width:100%;height:auto}
+body.btx-legacy #bodyarea .btx-pp-body .post table{max-width:100%}
+body.btx-legacy #bodyarea .btx-pp-body .post pre,
+body.btx-legacy #bodyarea .btx-pp-body .post code{max-width:100%;overflow:auto}
+body.btx-legacy #bodyarea .btx-pp-body .post hr{margin:10px 0}
+body.btx-legacy #bodyarea .btx-pp-body .quoteheader,
+body.btx-legacy #bodyarea .btx-pp-body .codeheader{
+  background:var(--quote-bg) !important;border:1px solid var(--quote-border) !important;border-bottom:0 !important;
+  border-radius:10px 10px 0 0;padding:6px 12px;margin:10px 0 0;font-size:12px;color:var(--muted) !important}
+body.btx-legacy #bodyarea .btx-pp-body .quote,
+body.btx-legacy #bodyarea .btx-pp-body .code{
+  background:var(--quote-bg) !important;border:1px solid var(--quote-border) !important;
+  border-radius:0 0 10px 10px;padding:8px 12px;margin:0 0 10px;font-size:13px}
+
+/* tombol aksi */
+body.btx-legacy #bodyarea .btx-pp-acts{
+  display:flex;flex-wrap:wrap;gap:8px;padding:10px 16px;border-top:1px solid var(--border);
+  background:color-mix(in srgb,var(--accent) 4%,var(--surface))}
+body.btx-legacy #bodyarea .btx-pp-acts a{
+  display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 12px;border-radius:999px;box-sizing:border-box;
+  background:var(--surface2);color:var(--text) !important;font-size:12px;font-weight:600;text-decoration:none;
+  border:1px solid var(--border)}
+body.btx-legacy #bodyarea .btx-pp-acts a:hover{background:var(--accent);color:var(--on-accent) !important;border-color:transparent}
+body.btx-legacy #bodyarea .btx-pp-acts img{height:14px;width:auto;vertical-align:middle}
+
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pp{gap:12px}
+  body.btx-legacy #bodyarea .btx-pp-h1{font-size:19px}
+  body.btx-legacy #bodyarea .btx-pp-head{padding:8px 12px}
+  body.btx-legacy #bodyarea .btx-pp-title{padding:12px 12px 2px;font-size:16px}
+  body.btx-legacy #bodyarea .btx-pp-body{padding:6px 12px 14px}
+  body.btx-legacy #bodyarea .btx-pp-acts{padding:8px 12px}
+  body.btx-legacy #bodyarea .btx-pp-item{border-left-width:3px;border-radius:var(--r-md)}
+}
+
+/* ==== Show Posts card header: crumbs over title ==== */
+body.btx-legacy #bodyarea .btx-pp-head{
+  display:grid !important;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:0 12px;padding:10px 16px}
+body.btx-legacy #bodyarea .btx-pp-hm{min-width:0;display:grid;gap:2px}
+body.btx-legacy #bodyarea .btx-pp-hm .btx-pp-crumbs{flex:none;font-size:12px;line-height:1.3}
+body.btx-legacy #bodyarea .btx-pp-t2{
+  display:block;font-size:16px;font-weight:700;line-height:1.35;letter-spacing:-.01em;
+  overflow-wrap:anywhere;color:var(--text) !important;text-decoration:none}
+body.btx-legacy #bodyarea .btx-pp-t2:hover{color:var(--accent) !important}
+body.btx-legacy #bodyarea .btx-pp-date{align-self:start;margin-left:0;padding-top:1px}
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pp-head{grid-template-columns:auto minmax(0,1fr);padding:8px 12px;gap:0 10px}
+  body.btx-legacy #bodyarea .btx-pp-date{grid-column:2;margin-top:3px;white-space:normal}
+  body.btx-legacy #bodyarea .btx-pp-t2{font-size:15px}
+}
+
+/* ==== One-line pager (desktop + mobile) ==== */
+.btx-pager.btx-pager2,
+body.btx-legacy #bodyarea .btx-pgbar .btx-pager2,
+body.btx-legacy #bodyarea .btx-pager2{
+  position:relative;display:flex;flex-wrap:nowrap !important;justify-content:flex-start !important;align-items:center;
+  gap:6px;max-width:100%;padding:2px 0;margin:6px 0;
+  overflow-x:auto !important;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.btx-pager2::-webkit-scrollbar{display:none}
+.btx-pager2 > *{flex:none}
+.btx-pager2 .pg.nav .t{display:none !important}
+body.btx-legacy #bodyarea td.btx-pgcell{min-width:0;max-width:100%}
+body.btx-legacy #bodyarea .btx-pgbar .btx-pager2{margin:0}
+
+.btx-pager2 .pg,
+body.btx-legacy #bodyarea .btx-pgbar .btx-pager2 .pg{
+  min-width:34px !important;height:34px !important;padding:0 10px !important;font-size:14px !important;border-radius:10px !important}
+.btx-pager2 .gap{padding:0 1px}
+.btx-pager2 .btx-jump{display:flex;align-items:center;gap:6px;margin-left:6px}
+.btx-pager2 .btx-jump input{
+  width:80px !important;height:34px !important;padding:0 10px !important;border-radius:10px !important;
+  font-size:14px !important;box-sizing:border-box;-moz-appearance:textfield}
+.btx-pager2 .btx-jump input::-webkit-outer-spin-button,
+.btx-pager2 .btx-jump input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.btx-pager2 .btx-jump button{height:34px !important;padding:0 14px !important;border-radius:10px !important;font-size:13px !important}
+
+@media(max-width:759px){
+  .btx-pager.btx-pager2,
+  body.btx-legacy #bodyarea .btx-pager2{gap:4px}
+  .btx-pager2 .pg,
+  body.btx-legacy #bodyarea .btx-pgbar .btx-pager2 .pg{
+    min-width:30px !important;height:32px !important;padding:0 8px !important;font-size:13px !important;border-radius:9px !important}
+  .btx-pager2 .pg.far{display:none !important}
+  .btx-pager2 .btx-jump{margin-left:2px}
+  .btx-pager2 .btx-jump input{width:62px !important;height:32px !important;padding:0 6px !important;font-size:16px !important;text-align:center}
+  .btx-pager2 .btx-jump button{display:none}
+}
+
+/* ==== Show Posts v4: aligned columns, auto-fit badge, fonts, full-width pager ==== */
+
+/* layout: title + pager on top (full width), cards and sidebar start on the same line below */
+body.btx-legacy #bodyarea .btx-pp{
+  display:grid;grid-template-columns:minmax(0,1fr);
+  grid-template-areas:"top" "main" "side";
+  gap:12px 18px;align-items:start}
+body.btx-legacy #bodyarea .btx-pp-top{grid-area:top;display:grid;gap:8px;min-width:0}
+body.btx-legacy #bodyarea .btx-pp-main{grid-area:main;display:grid;grid-template-columns:minmax(0,1fr);gap:12px;min-width:0;align-content:start}
+body.btx-legacy #bodyarea .btx-pp-side{grid-area:side;min-width:0}
+@media(min-width:900px){
+  body.btx-legacy #bodyarea .btx-pp{
+    grid-template-columns:minmax(0,1fr) 280px;
+    grid-template-areas:"top top" "main side"}
+  body.btx-legacy #bodyarea .btx-pp-side{position:sticky;top:72px}
+}
+body.btx-legacy #bodyarea .btx-pp-h1{margin:2px 4px 0}
+
+/* pager: full width, jump box pinned to the far right */
+.btx-pager2{width:100%}
+body.btx-legacy #bodyarea .btx-pp .btx-pager2{width:100%;margin:0;padding:2px 2px 4px}
+.btx-pager2 .btx-jump{margin-left:auto !important;padding-left:8px}
+
+/* number badge: width follows the number */
+body.btx-legacy #bodyarea .btx-pp-num{
+  display:inline-flex !important;align-items:center;justify-content:center;
+  width:auto !important;height:auto !important;min-width:28px;max-width:none !important;
+  padding:4px 10px !important;border:0 !important;box-sizing:border-box;
+  align-self:center;justify-self:start;white-space:nowrap;overflow:visible;
+  line-height:1.2;font-variant-numeric:tabular-nums;border-radius:9px}
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pp-num{align-self:start;padding:3px 9px !important;min-width:26px}
+}
+
+/* fonts: sidebar, card header and actions follow the "Thread & Content" font + size */
+body.btx-legacy #bodyarea :is(.btx-pp-side,.btx-pp-head,.btx-pp-acts,.btx-pp-h1){zoom:var(--btx-fs-ct,1)}
+body.btx-legacy #bodyarea .btx-pp .btx-pager2{zoom:var(--btx-fs-ui,1)}
+
+:root[data-fct="1"] body.btx-legacy #bodyarea :is(.btx-pp-side,.btx-pp-head,.btx-pp-acts,.btx-pp-h1),
+:root[data-fct="1"] body.btx-legacy #bodyarea :is(.btx-pp-side,.btx-pp-head,.btx-pp-acts,.btx-pp-h1) *{
+  font-family:var(--btx-ff-ct) !important}
+:root[data-fui="1"] body.btx-legacy #bodyarea .btx-pp .btx-pager2,
+:root[data-fui="1"] body.btx-legacy #bodyarea .btx-pp .btx-pager2 *{
+  font-family:var(--btx-ff-ui) !important}
+
+/* ==== Show Posts v4: full-height badge, always-visible jump box, stats page ==== */
+
+/* badge nomor setinggi isi header */
+body.btx-legacy #bodyarea .btx-pp-head{align-items:stretch !important}
+body.btx-legacy #bodyarea .btx-pp-num{
+  align-self:stretch !important;height:auto !important;min-height:40px;
+  padding:0 12px !important;border-radius:10px !important;font-size:15px !important}
+body.btx-legacy #bodyarea .btx-pp-hm,
+body.btx-legacy #bodyarea .btx-pp-date{align-self:center !important}
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pp-num{grid-column:1;grid-row:1 / span 2;align-self:stretch !important;min-height:44px;padding:0 10px !important}
+  body.btx-legacy #bodyarea .btx-pp-hm{grid-column:2;grid-row:1}
+  body.btx-legacy #bodyarea .btx-pp-date{grid-column:2 !important;grid-row:2;margin-top:3px}
+}
+
+/* pager: daftar nomor bisa digeser, kotak lompat selalu terlihat di kanan */
+.btx-pager.btx-pager2,
+body.btx-legacy #bodyarea .btx-pager2,
+body.btx-legacy #bodyarea .btx-pgbar .btx-pager2{
+  display:flex;flex-wrap:nowrap !important;align-items:center;gap:8px;width:100%;
+  overflow:visible !important}
+.btx-pager2 .btx-pgs{
+  position:relative;display:flex;flex-wrap:nowrap;align-items:center;gap:6px;
+  flex:1 1 auto !important;min-width:0;padding:2px 1px;
+  overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.btx-pager2 .btx-pgs::-webkit-scrollbar{display:none}
+.btx-pager2 .btx-pgs > *{flex:none}
+.btx-pager2 .btx-jump{flex:none !important;margin-left:auto !important;padding-left:0;position:relative}
+@media(max-width:759px){
+  .btx-pager.btx-pager2,
+  body.btx-legacy #bodyarea .btx-pager2{gap:6px}
+  .btx-pager2 .btx-pgs{gap:4px}
+  .btx-pager2 .btx-jump input{width:66px !important;min-width:0}
+}
+
+/* halaman User Stats */
+body.btx-legacy #bodyarea .btx-pp-content{min-width:0;max-width:100%;overflow-x:auto}
+body.btx-legacy #bodyarea .btx-pp-content table.tborder{width:100% !important;max-width:100% !important}
+body.btx-legacy #bodyarea .btx-pp-content td{overflow-wrap:anywhere}
+body.btx-legacy #bodyarea .btx-pp-content > div[align="center"]{margin-top:14px !important}
+
+/* ==== Pager v5: buttons stretch to the jump box, never overflow ==== */
+
+/* lebar tidak melewati kartu walaupun font di-zoom */
+body.btx-legacy #bodyarea .btx-pp .btx-pager2,
+body.btx-legacy #bodyarea .btx-pager2,
+.btx-wrap > .btx-pager2{
+  width:calc(100% / var(--btx-fs-ui,1)) !important;
+  max-width:calc(100% / var(--btx-fs-ui,1)) !important;
+  box-sizing:border-box}
+
+/* daftar nomor mengisi seluruh ruang sampai kotak lompat */
+.btx-pager2 .btx-pgs{
+  flex:1 1 0 !important;min-width:0;width:auto;
+  overflow:hidden;gap:6px}
+.btx-pager2 .btx-pgs > .pg{
+  flex:1 1 0 !important;min-width:34px;width:auto;
+  display:inline-flex;align-items:center;justify-content:center}
+.btx-pager2 .btx-pgs > .gap{flex:0 0 auto !important}
+
+/* kotak lompat tetap di ujung kanan, ukurannya tetap */
+.btx-pager2 .btx-jump{flex:0 0 auto !important;margin-left:0 !important}
+
+/* mobile: tombol menyusut supaya semua pas dan lurus */
+@media(max-width:759px){
+  .btx-pager2 .btx-pgs{gap:4px}
+  .btx-pager2 .btx-pgs > .pg{
+    min-width:0 !important;padding:0 !important;
+    font-size:13px !important;height:32px !important}
+  .btx-pager2 .btx-jump input{
+    width:72px !important;min-width:0 !important;padding:0 4px !important;
+    text-align:center;font-size:16px !important}
+  .btx-pager2 .btx-jump button{display:none}
+}
+@media(max-width:400px){
+  .btx-pager2 .btx-pgs > .gap{display:none}
+  .btx-pager2 .btx-pgs > .pg{font-size:12px !important}
+  .btx-pager2 .btx-jump input{width:64px !important}
+}
+
+/* ==== Pager v6: long list on desktop, short list on mobile ==== */
+.btx-pager2 .btx-pgs.d{display:none}
+@media(min-width:900px){
+  .btx-pager2 .btx-pgs.m{display:none}
+  .btx-pager2 .btx-pgs.d{display:flex}
+  .btx-pager2 .btx-pgs.d > .pg{min-width:30px !important;padding:0 6px !important}
+  .btx-pager2 .btx-pgs.d > .pg.nav{flex:0 1 44px !important}
+}
+
+/* ==== Thread bar v7: full-width pager row, one-line action buttons ==== */
+
+/* pager di bar thread: lebar penuh, tanpa koreksi zoom ganda */
+body.btx-legacy #bodyarea .btx-pgbar .btx-pager2{
+  width:100% !important;max-width:100% !important;margin:0;box-sizing:border-box}
+body.btx-legacy #bodyarea .btx-pgbar > tbody > tr{
+  display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:10px 16px}
+body.btx-legacy #bodyarea .btx-pgbar > tbody > tr > td.btx-pgcell{
+  flex:1 1 100% !important;width:100% !important;min-width:0}
+body.btx-legacy #bodyarea .btx-pgbar > tbody > tr > td:not(.btx-pgcell){
+  flex:1 1 100% !important;min-width:0;text-align:right}
+
+/* kotak lompat: lebar mengikuti font, tidak terpotong */
+.btx-pager2 .btx-jump input{
+  width:calc(8ch + 18px) !important;min-width:0 !important;
+  padding:0 8px !important;text-align:center}
+@media(max-width:759px){
+  .btx-pager2 .btx-jump input{
+    width:calc(8ch + 14px) !important;padding:0 6px !important;font-size:15px !important}
+}
+
+/* tombol reply / unwatch / notify / mark unread / print */
+body.btx-legacy #bodyarea .btx-pgbar td.mirrortab_back,
+body.btx-legacy #bodyarea .btx-pgbar td.maintab_back{
+  display:flex !important;flex-wrap:wrap !important;justify-content:flex-end !important;
+  align-items:center;gap:6px !important;width:100% !important}
+body.btx-legacy #bodyarea .btx-pgbar td.mirrortab_back a,
+body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a{
+  flex:0 1 auto !important;height:32px !important;padding:0 14px !important;
+  font-size:12.5px !important;white-space:nowrap !important;
+  overflow:visible !important;text-overflow:clip !important;
+  display:inline-flex !important;align-items:center;justify-content:center}
+
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pgbar > tbody > tr > td:not(.btx-pgcell){text-align:left}
+  body.btx-legacy #bodyarea .btx-pgbar td.mirrortab_back,
+  body.btx-legacy #bodyarea .btx-pgbar td.maintab_back{
+    flex-wrap:wrap !important;justify-content:stretch !important;gap:5px !important;margin:6px 0 0 !important}
+  body.btx-legacy #bodyarea .btx-pgbar td.mirrortab_back a,
+  body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a{
+    flex:1 1 auto !important;padding:0 6px !important;font-size:11.5px !important}
+}
+@media(max-width:400px){
+  body.btx-legacy #bodyarea .btx-pgbar td.mirrortab_back a,
+  body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a{
+    padding:0 4px !important;font-size:10.5px !important}
+}
+
+/* ==== Thread bar v8: grid layout, auto-size buttons ==== */
+
+/* kerangka: baris atas = nomor halaman, baris bawah = prev/next (kiri) + tombol aksi (kanan) */
+body.btx-legacy #bodyarea table.btx-pgbar > tbody > tr{
+  display:grid !important;
+  grid-template-columns:auto minmax(0,1fr);
+  grid-template-areas:"pg pg" "nav acts";
+  align-items:center;gap:10px 16px}
+body.btx-legacy #bodyarea table.btx-pgbar > tbody > tr > td.btx-pgcell{
+  grid-area:pg;width:100% !important;min-width:0;padding:0 !important}
+
+/* sel kanan dilepas supaya isinya bisa ditata langsung oleh grid */
+body.btx-legacy #bodyarea table.btx-pgbar > tbody > tr > td:not(.btx-pgcell){
+  display:contents !important}
+body.btx-legacy #bodyarea table.btx-pgbar td table,
+body.btx-legacy #bodyarea table.btx-pgbar td table > tbody,
+body.btx-legacy #bodyarea table.btx-pgbar td table > tbody > tr{
+  display:contents !important}
+
+/* previous / next topic */
+body.btx-legacy #bodyarea table.btx-pgbar div.nav{
+  grid-area:nav;display:flex !important;flex-wrap:wrap;align-items:stretch;
+  justify-content:flex-start !important;gap:6px !important;margin:0 !important;padding:0}
+
+/* tombol aksi */
+body.btx-legacy #bodyarea table.btx-pgbar td.mirrortab_back,
+body.btx-legacy #bodyarea table.btx-pgbar td.maintab_back{
+  grid-area:acts;display:flex !important;flex-wrap:wrap !important;align-items:stretch !important;
+  justify-content:flex-end !important;gap:6px !important;
+  width:auto !important;margin:0 !important;padding:0 !important}
+
+/* satu gaya untuk semua tombol, tinggi mengikuti font (em) */
+body.btx-legacy #bodyarea table.btx-pgbar div.nav a,
+body.btx-legacy #bodyarea table.btx-pgbar td.mirrortab_back a,
+body.btx-legacy #bodyarea table.btx-pgbar td.maintab_back a{
+  display:inline-flex !important;align-items:center;justify-content:center;
+  flex:0 1 auto !important;height:auto !important;min-height:2.5em !important;
+  margin:0 !important;padding:.35em 1.1em !important;box-sizing:border-box;
+  font-size:12.5px !important;font-weight:700;line-height:1.2 !important;
+  white-space:nowrap !important;overflow:visible !important;text-overflow:clip !important;
+  text-decoration:none;border-radius:10px !important;
+  color:var(--accent) !important;
+  background:color-mix(in srgb,var(--accent) 12%,var(--surface)) !important;
+  border:1px solid color-mix(in srgb,var(--accent) 35%,transparent) !important;
+  transition:background .15s,color .15s}
+body.btx-legacy #bodyarea table.btx-pgbar div.nav a:hover,
+body.btx-legacy #bodyarea table.btx-pgbar td.mirrortab_back a:hover,
+body.btx-legacy #bodyarea table.btx-pgbar td.maintab_back a:hover{
+  background:var(--accent) !important;color:var(--on-accent) !important;border-color:transparent !important}
+body.btx-legacy #bodyarea table.btx-pgbar td.mirrortab_back a[href*="action=post;"],
+body.btx-legacy #bodyarea table.btx-pgbar td.maintab_back a[href*="action=post;"]{
+  background:var(--accent) !important;color:var(--on-accent) !important;border-color:transparent !important;
+  box-shadow:0 2px 8px color-mix(in srgb,var(--accent) 40%,transparent)}
+
+/* mobile: prev (kiri) + next (kanan), lalu nomor halaman, lalu tombol aksi */
+@media(max-width:759px){
+  body.btx-legacy #bodyarea table.btx-pgbar > tbody > tr{
+    grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"nav" "pg" "acts";gap:8px}
+  body.btx-legacy #bodyarea table.btx-pgbar div.nav{
+    flex-wrap:nowrap;justify-content:space-between !important;gap:8px !important}
+  body.btx-legacy #bodyarea table.btx-pgbar div.nav a{
+    flex:1 1 0 !important;min-width:0;padding:.35em .6em !important}
+  body.btx-legacy #bodyarea table.btx-pgbar td.mirrortab_back,
+  body.btx-legacy #bodyarea table.btx-pgbar td.maintab_back{
+    justify-content:stretch !important;width:100% !important}
+  body.btx-legacy #bodyarea table.btx-pgbar td.mirrortab_back a,
+  body.btx-legacy #bodyarea table.btx-pgbar td.maintab_back a{
+    flex:1 1 auto !important;padding:.35em .6em !important;font-size:11.5px !important}
+}
+@media(max-width:400px){
+  body.btx-legacy #bodyarea table.btx-pgbar td.mirrortab_back a,
+  body.btx-legacy #bodyarea table.btx-pgbar td.maintab_back a{
+    padding:.35em .45em !important;font-size:10.5px !important}
+}
+
+/* ==== Thread bar v9: tight vertical rhythm, no phantom rows ==== */
+
+/* buang elemen kosong yang bikin baris grid tambahan */
+body.btx-legacy #bodyarea table.btx-pgbar br,
+body.btx-legacy #bodyarea table.btx-pgbar td:empty,
+body.btx-legacy #bodyarea table.btx-pgbar td.mirrortab_first,
+body.btx-legacy #bodyarea table.btx-pgbar td.mirrortab_last,
+body.btx-legacy #bodyarea table.btx-pgbar td.maintab_first,
+body.btx-legacy #bodyarea table.btx-pgbar td.maintab_last{
+  display:none !important}
+
+/* baris grid rapat dari atas, tidak melar */
+body.btx-legacy #bodyarea table.btx-pgbar > tbody > tr{
+  align-content:start !important;
+  grid-auto-rows:min-content !important;
+  row-gap:8px !important;column-gap:12px !important;
+  height:auto !important;min-height:0 !important}
+body.btx-legacy #bodyarea table.btx-pgbar,
+body.btx-legacy #bodyarea table.btx-pgbar > tbody{
+  height:auto !important;margin:0 !important}
+body.btx-legacy #bodyarea table.btx-pgbar td{
+  height:auto !important;line-height:1.2}
+
+/* pager dan tombol tanpa margin tambahan */
+body.btx-legacy #bodyarea table.btx-pgbar .btx-pager2{margin:0 !important;padding:0 !important}
+body.btx-legacy #bodyarea table.btx-pgbar div.nav,
+body.btx-legacy #bodyarea table.btx-pgbar td.mirrortab_back,
+body.btx-legacy #bodyarea table.btx-pgbar td.maintab_back{
+  margin:0 !important;padding:0 !important;line-height:1.2 !important;font-size:0 !important}
+
+/* jarak ke kartu post di bawahnya: satu nilai saja */
+body.btx-legacy #bodyarea table.btx-pgbar{margin-bottom:10px !important}
+body.btx-legacy #bodyarea #quickModForm{margin-top:0 !important}
+body.btx-legacy #bodyarea #quickModForm > table.bordercolor{margin-top:0 !important}
+
+@media(max-width:759px){
+  body.btx-legacy #bodyarea table.btx-pgbar > tbody > tr{row-gap:6px !important}
+  body.btx-legacy #bodyarea table.btx-pgbar{margin-bottom:8px !important}
+}
+
+/* ==== Merit chip (mobile only) ==== */
+.btx-merit-sum{display:none}
+#btx-merit-tip{
+  position:fixed;z-index:2147483000;display:none;box-sizing:border-box;
+  width:min(340px,calc(100vw - 16px));max-height:min(50vh,320px);overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:10px 12px;border-radius:14px;background:var(--surface);color:var(--text);
+  border:1px solid var(--border);box-shadow:0 8px 28px rgba(0,0,0,.28);
+  font:13px/1.9 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+#btx-merit-tip a{
+  display:inline-block;margin:0 4px 4px 0;padding:0 9px;border-radius:999px;line-height:1.9;
+  background:color-mix(in srgb,var(--accent) 12%,var(--surface2));color:var(--accent) !important;text-decoration:none;font-weight:600}
+#btx-merit-tip a b{color:var(--text);font-weight:700}
+
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-merit-orig{display:none !important}
+  body.btx-legacy #bodyarea .btx-merit-sum{display:block;margin:4px 0}
+  body.btx-legacy #bodyarea .btx-mchip{
+    display:inline-flex;align-items:center;max-width:100%;padding:.3em .9em;border-radius:999px;
+    background:color-mix(in srgb,var(--accent) 12%,var(--surface));color:var(--accent);
+    border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);
+    font:600 12px/1.3 inherit;font-family:inherit;cursor:pointer;white-space:normal;text-align:left}
+}
+@media(min-width:760px){
+  #btx-merit-tip{display:none !important}
+}
+
+/* ==== Thread pager v10: same mobile pager as Show Posts ==== */
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pgbar .btx-pager2{
+    display:flex !important;flex-wrap:nowrap !important;align-items:center;
+    gap:6px !important;width:100% !important;max-width:100% !important;
+    overflow:visible !important;box-sizing:border-box}
+
+  /* daftar nomor: mengisi ruang yang ada, tombol menyusut rata */
+  body.btx-legacy #bodyarea .btx-pgbar .btx-pager2 .btx-pgs{
+    flex:1 1 0 !important;min-width:0 !important;width:auto !important;
+    gap:4px !important;overflow:hidden !important}
+  body.btx-legacy #bodyarea .btx-pgbar .btx-pager2 .btx-pgs > .pg{
+    flex:1 1 0 !important;min-width:0 !important;width:auto !important;
+    height:32px !important;padding:0 !important;
+    font-size:13px !important;border-radius:9px !important;
+    display:inline-flex !important;align-items:center;justify-content:center}
+  body.btx-legacy #bodyarea .btx-pgbar .btx-pager2 .btx-pgs > .gap{
+    flex:0 0 auto !important;padding:0 1px !important}
+
+  /* kotak lompat: ukuran tetap, selalu terlihat di kanan */
+  body.btx-legacy #bodyarea .btx-pgbar .btx-pager2 .btx-jump{
+    flex:0 0 auto !important;margin:0 !important;padding:0 !important}
+  body.btx-legacy #bodyarea .btx-pgbar .btx-pager2 .btx-jump input{
+    width:72px !important;min-width:0 !important;height:32px !important;
+    padding:0 4px !important;border-radius:9px !important;
+    font-size:16px !important;text-align:center;box-sizing:border-box}
+  body.btx-legacy #bodyarea .btx-pgbar .btx-pager2 .btx-jump button{display:none !important}
+}
+@media(max-width:400px){
+  body.btx-legacy #bodyarea .btx-pgbar .btx-pager2 .btx-pgs > .gap{display:none !important}
+  body.btx-legacy #bodyarea .btx-pgbar .btx-pager2 .btx-pgs > .pg{font-size:12px !important}
+  body.btx-legacy #bodyarea .btx-pgbar .btx-pager2 .btx-jump input{width:64px !important}
+}
+
+/* ==== Quote v11: header + body as one card, readable nested quotes ==== */
+
+/* header "Quote from ..." menyatu dengan isi quote */
+body.btx-legacy #bodyarea :is(.post,.btx-pp-body) .quoteheader{
+  display:block;margin:10px 0 0 !important;padding:6px 12px !important;
+  background:color-mix(in srgb,var(--accent) 10%,var(--quote-bg)) !important;
+  border:1px solid var(--quote-border) !important;border-bottom:0 !important;
+  border-left:3px solid var(--accent) !important;
+  border-radius:10px 10px 0 0 !important;
+  font-size:12px !important;font-weight:600 !important;line-height:1.35 !important;
+  overflow-wrap:anywhere}
+body.btx-legacy #bodyarea :is(.post,.btx-pp-body) .quoteheader a{
+  color:var(--accent) !important;text-decoration:none}
+
+/* isi quote */
+body.btx-legacy #bodyarea :is(.post,.btx-pp-body) .quote{
+  display:block;margin:0 0 10px !important;padding:8px 12px !important;
+  background:var(--quote-bg) !important;
+  border:1px solid var(--quote-border) !important;border-top:0 !important;
+  border-left:3px solid var(--accent) !important;
+  border-radius:0 0 10px 10px !important;
+  font-size:13.5px !important;line-height:1.55 !important;
+  overflow-wrap:anywhere;max-width:100%;box-sizing:border-box}
+
+/* quote bersarang: lebih ringan, bertingkat */
+body.btx-legacy #bodyarea :is(.post,.btx-pp-body) .quote .quoteheader{
+  margin:8px 0 0 !important;padding:4px 10px !important;font-size:11.5px !important;
+  background:color-mix(in srgb,var(--accent) 7%,var(--surface)) !important;
+  border-left-color:color-mix(in srgb,var(--accent) 60%,transparent) !important;
+  border-radius:8px 8px 0 0 !important}
+body.btx-legacy #bodyarea :is(.post,.btx-pp-body) .quote .quote{
+  margin:0 0 8px !important;padding:6px 10px !important;font-size:13px !important;
+  background:var(--surface) !important;
+  border-left-color:color-mix(in srgb,var(--accent) 60%,transparent) !important;
+  border-radius:0 0 8px 8px !important}
+body.btx-legacy #bodyarea :is(.post,.btx-pp-body) .quote .quote .quoteheader{
+  background:color-mix(in srgb,var(--accent) 5%,var(--surface2)) !important;
+  border-left-color:color-mix(in srgb,var(--accent) 35%,transparent) !important}
+body.btx-legacy #bodyarea :is(.post,.btx-pp-body) .quote .quote .quote{
+  background:var(--surface2) !important;
+  border-left-color:color-mix(in srgb,var(--accent) 35%,transparent) !important}
+
+/* quote kosong di akhir tidak menambah jarak */
+body.btx-legacy #bodyarea :is(.post,.btx-pp-body) .quote > :last-child{margin-bottom:0}
+
+@media(max-width:759px){
+  body.btx-legacy #bodyarea :is(.post,.btx-pp-body) .quoteheader{padding:5px 10px !important;font-size:11.5px !important}
+  body.btx-legacy #bodyarea :is(.post,.btx-pp-body) .quote{padding:7px 10px !important;font-size:13px !important}
+  body.btx-legacy #bodyarea :is(.post,.btx-pp-body) .quote .quote{font-size:12.5px !important}
+}
+
+/* ==== Background presets ==== */
+.btx-bgsw{flex-wrap:wrap}
+:root[data-theme="light"][data-bg="white"]{--bg:#ffffff}
+:root[data-theme="dark"][data-bg="white"]{--bg:#000000}
+:root[data-theme="light"][data-bg="sand"]{--bg:#EDE8DF}
+:root[data-theme="dark"][data-bg="sand"]{--bg:#17150f}
+:root[data-theme="light"][data-bg="sage"]{--bg:#E3EAE4}
+:root[data-theme="dark"][data-bg="sage"]{--bg:#121815}
+:root[data-theme="light"][data-bg="sky"]{--bg:#E1E9F2}
+:root[data-theme="dark"][data-bg="sky"]{--bg:#101620}
+:root[data-theme="light"][data-bg="lavender"]{--bg:#E9E6F2}
+:root[data-theme="dark"][data-bg="lavender"]{--bg:#15131f}
+:root[data-theme="light"][data-bg="rose"]{--bg:#F1E6E6}
+:root[data-theme="dark"][data-bg="rose"]{--bg:#1c1316}
+:root[data-theme="light"][data-bg="slate"]{--bg:#D3D7DE}
+:root[data-theme="dark"][data-bg="slate"]{--bg:#0b0c10}
+
+/* ==== Color themes ==== */
+:root{--link:var(--accent)}
+:root[data-theme="dark"]{--link:#a9c9ea}
+
+/* panel pilihan tema */
+.btx-pal{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.btx-palbtn{display:flex;align-items:center;gap:8px;min-width:0;padding:6px 8px;border-radius:12px;
+  border:2px solid transparent;background:var(--surface2);color:var(--text);text-align:left;
+  font-size:13px;font-weight:600;line-height:1.2;cursor:pointer}
+.btx-palbtn.on{border-color:var(--accent)}
+.btx-palbtn .n{min-width:0;overflow-wrap:anywhere}
+.btx-palsw{flex:none;width:30px;height:30px;border-radius:50%;outline:1px solid var(--border)}
+#btx-pal .btx-sheet{max-height:88vh;overflow-y:auto}
+
+/* --- tema gelap --- */
+:root[data-theme="dark"][data-pal="slate"]{
+  --bg:#0F1A20;
+  --surface:#17242C;
+  --surface2:#1F2F38;
+  --text:#D0DDE5;
+  --muted:#8FA2B0;
+  --border:#263842;
+  --accent:#7FBDD6;
+  --on-accent:#111111;
+  --head-bg:#7FBDD6;
+  --head-text:#111111;
+  --head-border:#263842;
+  --quote-bg:#1F2F38;
+  --quote-border:#263842;
+  --link:#A2D3E8;
+}
+:root[data-theme="dark"][data-pal="olive"]{
+  --bg:#14180F;
+  --surface:#1C2215;
+  --surface2:#242B1C;
+  --text:#D5DAC8;
+  --muted:#929A80;
+  --border:#313A25;
+  --accent:#B4C264;
+  --on-accent:#0F1208;
+  --head-bg:#B4C264;
+  --head-text:#0F1208;
+  --head-border:#313A25;
+  --quote-bg:#242B1C;
+  --quote-border:#313A25;
+  --link:#CBD886;
+}
+/* --- Lightning: electric violet di atas lavender pucat --- */
+:root[data-theme="light"][data-pal="violet"]{
+  --bg:#F5F3FF;
+  --surface:#FFFFFF;
+  --surface2:#ECE8FA;
+  --text:#2A2440;
+  --muted:#6B6280;
+  --border:#DDD6F0;
+  --accent:#7C5CFF;
+  --on-accent:#FFFFFF;
+  --head-bg:#7C5CFF;
+  --head-text:#FFFFFF;
+  --head-border:#DDD6F0;
+  --quote-bg:#ECE8FA;
+  --quote-border:#DDD6F0;
+  --link:#6A4AE0;
+}
+:root[data-theme="dark"][data-pal="charcoal"]{--bg:#22252a;--surface:#2d3137;--surface2:#373b41;--text:#cfd3d9;--muted:#91959b;--border:#51555b;--accent:#8fa8c4;--on-accent:#111111;--head-bg:#8fa8c4;--head-text:#111111;--head-border:#51555b;--quote-bg:#373b41;--quote-border:#51555b;--link:#b6c6d9}
+:root[data-theme="dark"][data-pal="mocha"]{--bg:#28231f;--surface:#332d28;--surface2:#3d3731;--text:#d8cfc5;--muted:#999189;--border:#57514b;--accent:#c9a27e;--on-accent:#111111;--head-bg:#c9a27e;--head-text:#111111;--head-border:#57514b;--quote-bg:#3d3731;--quote-border:#57514b;--link:#dcc3ab}
+
+/* --- tema terang --- */
+:root[data-theme="light"][data-pal="clean"]{--bg:#f1f5f9;--surface:#ffffff;--surface2:#f1f1f2;--text:#0f172a;--muted:#6a6f7b;--border:#cacdd0;--accent:#2563eb;--on-accent:#ffffff;--head-bg:#2563eb;--head-text:#ffffff;--head-border:#cacdd0;--quote-bg:#f1f1f2;--quote-border:#cacdd0}
+:root[data-theme="light"][data-pal="paper"]{--bg:#efe8dc;--surface:#faf6ee;--surface2:#efeae2;--text:#3b2f25;--muted:#847b71;--border:#d0cac2;--accent:#a8552b;--on-accent:#ffffff;--head-bg:#a8552b;--head-text:#ffffff;--head-border:#d0cac2;--quote-bg:#efeae2;--quote-border:#d0cac2}
+:root[data-theme="light"][data-pal="sage"]{--bg:#e3e9e1;--surface:#f1f4ef;--surface2:#e5e9e4;--text:#2f3b33;--muted:#79817a;--border:#c6cbc6;--accent:#5f7f6b;--on-accent:#ffffff;--head-bg:#5f7f6b;--head-text:#ffffff;--head-border:#c6cbc6;--quote-bg:#e5e9e4;--quote-border:#c6cbc6}
+:root[data-theme="light"][data-pal="rose"]{--bg:#efe5e4;--surface:#f8f2f1;--surface2:#eee7e6;--text:#4a3a3b;--muted:#8c8080;--border:#d2cac9;--accent:#a8737a;--on-accent:#111111;--head-bg:#a8737a;--head-text:#111111;--head-border:#d2cac9;--quote-bg:#eee7e6;--quote-border:#d2cac9}
+:root[data-theme="light"][data-pal="neutral"]{--bg:#e4e4e7;--surface:#f4f4f5;--surface2:#e8e8e9;--text:#27272a;--muted:#757577;--border:#c7c7c8;--accent:#52525b;--on-accent:#ffffff;--head-bg:#52525b;--head-text:#ffffff;--head-border:#c7c7c8;--quote-bg:#e8e8e9;--quote-border:#c7c7c8}
+
+/* --- mode gelap: link di dalam post dan isi [code] dibuat cerah --- */
+:root[data-theme="dark"] body.btx-legacy #bodyarea .post a,
+:root[data-theme="dark"] body.btx-legacy #bodyarea .post a *{color:var(--link) !important}
+:root[data-theme="dark"] body.btx-legacy #bodyarea :is(.code,.codeheader),
+:root[data-theme="dark"] body.btx-legacy #bodyarea :is(.code,.codeheader) *{color:var(--link) !important}
+
+/* --- mode gelap: teks hitam di header post (subject) dan inline-black dibuat cerah --- */
+:root[data-theme="dark"] body.btx-legacy #bodyarea .td_headerandpost > table,
+:root[data-theme="dark"] body.btx-legacy #bodyarea .td_headerandpost > table :is(div,span,b,strong,a,td){color:var(--text) !important}
+:root[data-theme="dark"] body.btx-legacy #bodyarea .td_headerandpost > table .smalltext,
+:root[data-theme="dark"] body.btx-legacy #bodyarea .td_headerandpost > table .smalltext *{color:var(--muted) !important}
+:root[data-theme="dark"] body.btx-legacy #bodyarea :is([style*="color:black" i],[style*="color: black" i],[style*="color:#000000" i],[style*="color: #000000" i],[style*="color:#000;" i],[style*="color: #000;" i],[color="black" i],[color="#000000"]):not(.post *):not(.btx-sigplain *){color:var(--text) !important}
+
+/* --- palet ke-12 --- */
+/* --- palet ke-12: Mining Rig (warna Obsidian Amber) --- */
+:root[data-theme="dark"][data-pal="teal"]{
+  --bg:#14110D;
+  --surface:#1D1813;
+  --surface2:#26201A;
+  --text:#E5DAC8;
+  --muted:#A39782;
+  --border:#2F2822;
+  --accent:#E8B563;
+  --on-accent:#111111;
+  --head-bg:#E8B563;
+  --head-text:#111111;
+  --head-border:#2F2822;
+  --quote-bg:#26201A;
+  --quote-border:#2F2822;
+  --link:#F0C788;
+}
+
+/* --- trust: + selalu hijau, - selalu merah (tidak ikut aksen / warna teks) --- */
+:root{--trust-pos:#15803d;--trust-neg:#dc2626}
+:root[data-theme="dark"]{--trust-pos:#4ade80;--trust-neg:#f87171}
+.btx-tr-pos,body.btx-legacy #bodyarea .btx-tr-pos{color:var(--trust-pos) !important}
+.btx-tr-neg,body.btx-legacy #bodyarea .btx-tr-neg{color:var(--trust-neg) !important}
+
+/* --- pemilih aksen / warna teks: 8 lingkaran sama besar, 1 baris, rata kiri-kanan --- */
+.btx-csw{display:flex;flex-wrap:nowrap;justify-content:space-between;gap:0}
+.btx-csw > *{flex:none}
+.btx-csw .btx-sw,.btx-csw .btx-cpick{width:34px;height:34px}
+.btx-sw-default{display:grid;place-items:center;background:var(--surface2);color:var(--muted);font-size:20px;line-height:1}
+.btx-cpick{padding:0;border:0;border-radius:50%;background:none;cursor:pointer;outline:1px solid var(--border)}
+.btx-cpick.on{outline:2px solid var(--text)}
+.btx-cpick::-webkit-color-swatch-wrapper{padding:0}
+.btx-cpick::-webkit-color-swatch{border:0;border-radius:50%}
+.btx-cpick::-moz-color-swatch{border:0;border-radius:50%}
+@media(max-width:340px){.btx-csw .btx-sw,.btx-csw .btx-cpick{width:30px;height:30px}}
+
+/* --- popup warna: ringkas, tanpa scroll --- */
+#btx-pal .btx-sheet{max-width:560px;max-height:96vh;overflow-y:auto;padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
+#btx-pal .btx-sheet-h{margin-bottom:0}
+#btx-pal .btx-sheet-h h3{font-size:17px}
+#btx-pal .btx-sheet-h .btx-iconbtn{width:34px;height:34px}
+#btx-pal .btx-row{padding:10px 0}
+#btx-pal .btx-row .lbl{margin-bottom:6px;font-size:12px}
+#btx-pal .btx-pal{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+@media(min-width:600px){#btx-pal .btx-pal{grid-template-columns:repeat(3,minmax(0,1fr))}}
+#btx-pal .btx-palbtn{padding:4px 8px;gap:8px;font-size:12.5px;border-radius:10px}
+#btx-pal .btx-palsw{width:24px;height:24px}
+
+/* ==== Code v12: header + isi menyatu, lebar sama, rata kiri ==== */
+body.btx-legacy #bodyarea :is(.post,.btx-pp-body) .codeheader{
+  display:block;box-sizing:border-box;width:auto !important;max-width:100%;
+  margin:10px 0 0 !important;padding:6px 12px !important;text-align:left !important;
+  background:color-mix(in srgb,var(--accent) 10%,var(--quote-bg)) !important;
+  border:1px solid var(--quote-border) !important;border-bottom:0 !important;
+  border-left:3px solid var(--accent) !important;
+  border-radius:10px 10px 0 0 !important;
+  font-size:12px !important;font-weight:600 !important;line-height:1.35 !important}
+body.btx-legacy #bodyarea :is(.post,.btx-pp-body) .code{
+  display:block;box-sizing:border-box;width:auto !important;max-width:100%;
+  margin:0 0 10px !important;padding:10px 12px !important;text-align:left !important;
+  background:var(--quote-bg) !important;
+  border:1px solid var(--quote-border) !important;border-top:0 !important;
+  border-left:3px solid var(--accent) !important;
+  border-radius:0 0 10px 10px !important;
+  font-size:12.5px !important;line-height:1.5 !important}
+
+/* ==== Tombol Copy di header [code] ==== */
+body.btx-legacy #bodyarea :is(.post,.btx-pp-body) .codeheader.btx-hascopy{display:flex;align-items:center;gap:8px}
+body.btx-legacy #bodyarea .btx-copy{margin-left:auto;flex:none;display:inline-flex;align-items:center;height:24px;padding:0 11px;
+  border-radius:999px;box-sizing:border-box;border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);
+  background:var(--surface);color:var(--accent);font-family:inherit;font-size:11.5px;font-weight:600;line-height:1;
+  cursor:pointer;transition:background .15s,color .15s}
+body.btx-legacy #bodyarea .btx-copy:hover,
+body.btx-legacy #bodyarea .btx-copy.ok{background:var(--accent);color:var(--on-accent);border-color:transparent}
+:root[data-theme="dark"] body.btx-legacy #bodyarea .codeheader .btx-copy{color:var(--link) !important}
+:root[data-theme="dark"] body.btx-legacy #bodyarea .codeheader .btx-copy:hover,
+:root[data-theme="dark"] body.btx-legacy #bodyarea .codeheader .btx-copy.ok{color:var(--on-accent) !important}
+
+/* ukuran default lebih besar (desktop saja) */
+@media(min-width:760px){
+  body.btx-legacy #bodyarea .post{font-size:14px;line-height:1.55}
+  body.btx-legacy #bodyarea .btx-pi-stat{font-size:12px}
+}
+
+/* popup selalu di tengah layar, termasuk di mobile */
+.btx-overlay{align-items:center;padding:12px;box-sizing:border-box}
+.btx-sheet{border-radius:24px;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow-y:auto;padding-bottom:18px}
+@keyframes btxUp{from{transform:translateY(12px) scale(.98);opacity:0}to{transform:none;opacity:1}}
+
+
+/* ==== Tombol post: quote / edit / delete / +Merit / # dalam satu baris seragam ==== */
+body.btx-legacy #bodyarea td.td_buttons > div{
+  display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px;
+  font-size:0;line-height:1}
+body.btx-legacy #bodyarea td.td_buttons > div > a{
+  display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;
+  height:30px;min-width:30px;padding:0 10px;margin:0;border-radius:10px;
+  background:color-mix(in srgb,var(--accent) 12%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);
+  color:var(--accent) !important;font-size:12.5px;font-weight:700;line-height:1;
+  text-decoration:none;white-space:nowrap;transition:background .15s,color .15s}
+body.btx-legacy #bodyarea td.td_buttons > div > a:hover{
+  background:var(--accent);color:var(--on-accent) !important;border-color:transparent}
+body.btx-legacy #bodyarea td.td_buttons > div > a img{
+  display:block;height:16px;width:auto;margin:0}
+body.btx-legacy #bodyarea td.td_buttons > div > a span,
+body.btx-legacy #bodyarea td.td_buttons > div > a b{
+  vertical-align:baseline !important;color:inherit !important;font-weight:700}
+@media(max-width:759px){
+  body.btx-legacy #bodyarea td.td_buttons > div{justify-content:flex-start}
+  body.btx-legacy #bodyarea td.td_buttons > div > a{height:28px;min-width:28px;padding:0 8px;font-size:12px}
+}
+
+
+/* ==== Ganti gambar quote / edit / delete dengan teks ==== */
+body.btx-legacy #bodyarea td.td_buttons > div > a:has(img) img{display:none !important}
+body.btx-legacy #bodyarea td.td_buttons > div > a:has(img.reply_button)::after{content:"Quote"}
+body.btx-legacy #bodyarea td.td_buttons > div > a:has(img.modify_button)::after{content:"Edit"}
+body.btx-legacy #bodyarea td.td_buttons > div > a:has(img.remove_button)::after{content:"Delete"}
+
+
+/* ==== Efek timbul (emboss) untuk tombol post ====
+body.btx-legacy #bodyarea td.td_buttons > div > a{
+  background:linear-gradient(180deg,
+    color-mix(in srgb,var(--accent) 6%,#ffffff) 0%,
+    color-mix(in srgb,var(--accent) 22%,var(--surface)) 100%);
+  border:1px solid color-mix(in srgb,var(--accent) 55%,#000000);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.65),
+    inset 0 -1px 0 rgba(0,0,0,.18),
+    0 1px 2px rgba(0,0,0,.28);
+  text-shadow:0 1px 0 rgba(255,255,255,.6)}
+body.btx-legacy #bodyarea td.td_buttons > div > a:hover{
+  background:linear-gradient(180deg,
+    color-mix(in srgb,var(--accent) 85%,#ffffff) 0%,
+    var(--accent) 100%);
+  text-shadow:0 -1px 0 rgba(0,0,0,.3)}
+body.btx-legacy #bodyarea td.td_buttons > div > a:active{
+  transform:translateY(1px);
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.35)}
+:root[data-theme="dark"] body.btx-legacy #bodyarea td.td_buttons > div > a{
+  background:linear-gradient(180deg,
+    color-mix(in srgb,var(--accent) 30%,var(--surface2)) 0%,
+    color-mix(in srgb,var(--accent) 10%,var(--surface)) 100%);
+  border-color:color-mix(in srgb,var(--accent) 45%,#000000);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.18),
+    inset 0 -1px 0 rgba(0,0,0,.35),
+    0 1px 3px rgba(0,0,0,.5);
+  text-shadow:0 1px 0 rgba(0,0,0,.5)}
+:root[data-theme="dark"] body.btx-legacy #bodyarea td.td_buttons > div > a:hover{
+  background:linear-gradient(180deg,
+    color-mix(in srgb,var(--accent) 85%,#ffffff) 0%,
+    var(--accent) 100%);
+  text-shadow:0 -1px 0 rgba(0,0,0,.25)}*/
+
+
+/* ==== Judul / link thread mengikuti warna aksen tema ==== */
+.btx-t-title,
+.btx-last-t,
+.btx-rt,
+.btx-t-last b{color:var(--link) !important}
+.btx-t-title:hover{filter:brightness(1.15)}
+body.btx-legacy #bodyarea :is(.btx-pp-t2,.btx-pp-title){color:var(--link) !important}
+body.btx-legacy #bodyarea .td_headerandpost > table td:not(.td_buttons) a,
+body.btx-legacy #bodyarea .td_headerandpost > table td:not(.td_buttons) a *{color:var(--link) !important}
+
+
+/* ==== Judul post (subject) mengikuti warna aksen, menang atas aturan mode gelap ==== */
+:root body.btx-legacy #bodyarea .td_headerandpost > table div.subject a,
+:root[data-theme="dark"] body.btx-legacy #bodyarea .td_headerandpost > table div.subject a,
+:root[data-theme="dark"] body.btx-legacy #bodyarea .td_headerandpost > table div.subject a *{
+  color:var(--link) !important}
+
+/* ==== Tombol post di mobile: pas di dalam kartu, tidak melewati garis ==== */
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .td_headerandpost > table > tbody > tr > td.td_buttons{
+    flex:1 1 100% !important;width:100% !important;max-width:100% !important;
+    margin:0 !important;padding:4px 0 !important;box-sizing:border-box;text-align:left !important}
+  body.btx-legacy #bodyarea td.td_buttons > div{
+    display:flex !important;flex-wrap:nowrap !important;justify-content:space-between;
+    gap:4px !important;width:100% !important;max-width:100%;box-sizing:border-box}
+  body.btx-legacy #bodyarea td.td_buttons > div > a{
+    flex:1 1 0 !important;min-width:0 !important;height:30px !important;
+    padding:0 2px !important;font-size:11.5px !important;border-radius:9px !important;
+    overflow:hidden;text-overflow:ellipsis}
+  body.btx-legacy #bodyarea td.td_buttons > div > a.message_number{
+    flex:0 0 auto !important;padding:0 8px !important}
+}
+@media(max-width:380px){
+  body.btx-legacy #bodyarea td.td_buttons > div{gap:3px !important}
+  body.btx-legacy #bodyarea td.td_buttons > div > a{font-size:10.5px !important;border-radius:8px !important}
+}
+
+
+/* ==== Tombol post di mobile: ukuran lebih kecil dan ramping ==== */
+@media(max-width:759px){
+  body.btx-legacy #bodyarea td.td_buttons > div{
+    gap:3px !important;margin-top:-8px;margin-bottom:6px}
+  body.btx-legacy #bodyarea td.td_buttons > div > a{
+    height:24px !important;min-height:0 !important;
+    padding:0 2px !important;font-size:10.5px !important;font-weight:600 !important;
+    border-radius:7px !important;line-height:1 !important}
+  body.btx-legacy #bodyarea td.td_buttons > div > a.message_number{
+    padding:0 7px !important}
+}
+@media(max-width:380px){
+  body.btx-legacy #bodyarea td.td_buttons > div > a{
+    height:22px !important;font-size:10px !important}
+}
+
+
+/* ==== Tombol Upload ke TalkImg di atas kotak balasan ==== */
+body.btx-legacy #bodyarea .btx-tki{
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 6px}
+body.btx-legacy #bodyarea .btx-tki button{
+  display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;box-sizing:border-box;
+  border-radius:10px;font:inherit;font-size:13px;font-weight:700;line-height:1;cursor:pointer;
+  color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 12%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);
+  transition:background .15s,color .15s}
+body.btx-legacy #bodyarea .btx-tki button:hover{
+  background:var(--accent);color:var(--on-accent);border-color:transparent}
+body.btx-legacy #bodyarea .btx-tki-msg{font-size:12.5px;color:var(--muted)}
+body.btx-legacy #bodyarea .btx-tki-msg.ok{color:var(--trust-pos)}
+
+
+/* ==== Change Color + Upload ke TalkImg: ukuran dan posisi seragam ==== */
+body.btx-legacy #bodyarea select[onchange*="color="]{
+  display:inline-block;vertical-align:middle;box-sizing:border-box;
+  height:32px;min-height:0;margin:0 6px 0 0 !important;padding:0 12px;
+  border-radius:10px;font-size:13px;font-weight:700;line-height:1;cursor:pointer;
+  color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 12%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--accent) 45%,transparent)}
+body.btx-legacy #bodyarea select[onchange*="color="]:hover{
+  background:var(--accent);color:var(--on-accent)}
+body.btx-legacy #bodyarea select[onchange*="color="] option{
+  color:var(--text);background:var(--surface);font-weight:400}
+body.btx-legacy #bodyarea .btx-tki{
+  display:inline-flex;vertical-align:middle;margin:0 !important}
+body.btx-legacy #bodyarea .btx-tki button{
+  height:32px;vertical-align:middle}
+@media(max-width:759px){
+  body.btx-legacy #bodyarea select[onchange*="color="]{
+    height:34px;font-size:12.5px;padding:0 10px}
+  body.btx-legacy #bodyarea .btx-tki button{
+    height:34px;font-size:12.5px;padding:0 12px}
+}
+
+
+/* ==== Upload ke TalkImg: jarak dari ikon di toolbar (desktop) ==== */
+@media(min-width:760px){
+  body.btx-legacy #bodyarea .btx-tki{margin-left:8px !important}
+}
+
+
+/* ==== Change Color + Upload ke TalkImg: ukuran ramping, sama dengan ikon toolbar ==== */
+body.btx-legacy #bodyarea select[onchange*="color="],
+body.btx-legacy #bodyarea .btx-tki button{
+  height:24px !important;min-height:0 !important;line-height:1 !important;
+  padding:0 10px !important;font-size:12px !important;font-weight:700 !important;
+  border-radius:8px !important;box-sizing:border-box !important;margin-top:0 !important;margin-bottom:0 !important}
+body.btx-legacy #bodyarea select[onchange*="color="]{padding:0 6px 0 10px !important}
+body.btx-legacy #bodyarea .btx-tki{align-items:center}
+@media(max-width:759px){
+  body.btx-legacy #bodyarea select[onchange*="color="],
+  body.btx-legacy #bodyarea .btx-tki button{
+    height:26px !important;font-size:12px !important;padding:0 10px !important}
+  body.btx-legacy #bodyarea select[onchange*="color="]{padding:0 6px 0 10px !important}
+}
+
+
+/* ==== Change Color + Upload ke TalkImg: beri jarak di mobile ==== */
+@media(max-width:759px){
+  body.btx-legacy #bodyarea select[onchange*="color="]{
+    margin-top:8px !important;margin-bottom:4px !important;margin-right:12px !important}
+  body.btx-legacy #bodyarea .btx-tki{
+    margin-top:8px !important;margin-bottom:4px !important;margin-left:0 !important}
+}
+
 `;
 
   const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
@@ -1142,6 +2331,10 @@ body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
     sig: store.get('sig', true),
     pinfo: store.get('pinfo', true),
     pabbr: store.get('pabbr', true),
+    bg: store.get('bg', 'default'),
+    pal: store.get('pal', 'bitcointalk'),
+    accC: store.get('accC', 'default'),
+    txtC: store.get('txtC', 'default'),
     bitlist: store.get('bitlist', true),
     blinline: store.get('blinline', true),
     fsUi: store.get('fsUi', store.get('fsize', 100)),
@@ -1153,6 +2346,92 @@ body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
     fx: ((v) => (['all', 'ui', 'post', 'card'].includes(v) ? v : (v === 'content' ? 'post' : 'all')))(store.get('fx', 'all'))
   };
   const collapsed = store.get('collapsed', {});
+
+  // Palettes: [id, label, forced mode (null = keep current), page bg, card bg, accent]
+  const PALETTES = [
+    ['bitcointalk', 'Bitcointalk (Default)', 'light', '#E5E5E8', '#F6F6F6', '#476C8E'],
+    ['slate', 'Cold Storage', 'dark', '#0F1A20', '#17242C', '#7FBDD6'],
+    ['clean', 'Whitepaper', 'light', '#f1f5f9', '#ffffff', '#2563eb'],
+    ['olive', 'Proof of Stake', 'dark', '#14180F', '#1C2215', '#B4C264'],
+    ['paper', 'Paper Wallet', 'light', '#efe8dc', '#faf6ee', '#a8552b'],
+    ['violet', 'Lightning', 'light', '#F5F3FF', '#FFFFFF', '#7C5CFF'],
+    ['sage', 'Green Candle', 'light', '#e3e9e1', '#f1f4ef', '#5f7f6b'],
+    ['charcoal', 'Hardware Wallet', 'dark', '#22252a', '#2d3137', '#8fa8c4'],
+    ['rose', 'Bear Market', 'light', '#efe5e4', '#f8f2f1', '#a8737a'],
+    ['mocha', 'Genesis Block', 'dark', '#28231f', '#332d28', '#c9a27e'],
+    ['teal', 'Mining Rig', 'dark', '#14110D', '#1D1813', '#E8B563'],
+    ['neutral', 'Mempool', 'light', '#e4e4e7', '#f4f4f5', '#52525b']
+  ];
+
+  // Background presets: [id, light color, dark color, label]
+  const BG_PRESETS = [
+    ['default', '#E5E5E8', '#12131a', 'Default'],
+    ['white', '#ffffff', '#000000', LANG === 'id' ? 'Putih / Hitam' : 'White / Black'],
+    ['sand', '#EDE8DF', '#17150f', 'Sand'],
+    ['sage', '#E3EAE4', '#121815', 'Sage'],
+    ['sky', '#E1E9F2', '#101620', 'Sky'],
+    ['lavender', '#E9E6F2', '#15131f', 'Lavender'],
+    ['rose', '#F1E6E6', '#1c1316', 'Rose'],
+    ['slate', '#D3D7DE', '#0b0c10', 'Slate']
+  ];
+
+  // Accent presets: [id, label, light-mode color, dark-mode color]
+  const ACCENTS = [
+    ['blue', 'Blue', '#2563eb', '#7bb4f0'],
+    ['teal', 'Teal', '#0f766e', '#6fd3c3'],
+    ['green', 'Green', '#3f7d58', '#8fd0a4'],
+    ['orange', 'Orange', '#c2620a', '#f7a64a'],
+    ['rose', 'Rose', '#b4546a', '#e79ab0'],
+    ['purple', 'Purple', '#6d5bd0', '#b3a5f2']
+  ];
+
+  // Text color presets: [id, label, light-mode color, dark-mode color] (all soft, never pure white/black)
+  const TEXT_COLORS = [
+    ['soft', 'Soft', '#2a2a2e', '#ececf0'],
+    ['warm', 'Warm', '#3b2f25', '#efe3d3'],
+    ['cool', 'Cool', '#1e2a3a', '#dbe6f3'],
+    ['mint', 'Mint', '#243a2f', '#d3ecdc'],
+    ['lilac', 'Lilac', '#2d2a3d', '#e0d9f3'],
+    ['sand', 'Sand', '#4a3a1f', '#efe0bb']
+  ];
+
+  const cRgb = (c) => [1, 3, 5].map((i) => parseInt(c.substr(i, 2), 16));
+  const cHex = (a) => '#' + a.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+  const cMix = (a, b, t) => { const x = cRgb(a), y = cRgb(b); return cHex(x.map((v, i) => v * (1 - t) + y[i] * t)); };
+  const cLum = (c) => {
+    const k = cRgb(c).map((v) => v / 255).map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+    return 0.2126 * k[0] + 0.7152 * k[1] + 0.0722 * k[2];
+  };
+  const cRatio = (a, b) => { const x = cLum(a), y = cLum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const isHex = (v) => /^#[0-9a-f]{6}$/i.test(v || '');
+  // Resolves a preset id or custom #hex to a color for the current mode (null = theme default)
+  const pickColor = (list, v, dark) => {
+    if (!v || v === 'default') return null;
+    if (isHex(v)) return v;
+    const p = list.find((x) => x[0] === v);
+    return p ? (dark ? p[3] : p[2]) : null;
+  };
+
+  // Applies the custom accent and text color on top of the active theme (trust colors are never touched)
+  function applyColors() {
+    const root = document.documentElement;
+    const dark = resolvedTheme() === 'dark';
+    ['--accent', '--on-accent', '--head-bg', '--head-text', '--link', '--text', '--muted'].forEach((p) => root.style.removeProperty(p));
+    const ac = pickColor(ACCENTS, prefs.accC, dark);
+    if (ac) {
+      const on = cRatio(ac, '#ffffff') >= cRatio(ac, '#111111') ? '#ffffff' : '#111111';
+      root.style.setProperty('--accent', ac);
+      root.style.setProperty('--on-accent', on);
+      root.style.setProperty('--head-bg', ac);
+      root.style.setProperty('--head-text', on);
+      root.style.setProperty('--link', dark ? cMix(ac, '#ffffff', 0.35) : ac);
+    }
+    const tx = pickColor(TEXT_COLORS, prefs.txtC, dark);
+    if (tx) {
+      root.style.setProperty('--text', tx);
+      root.style.setProperty('--muted', 'color-mix(in srgb,var(--text) 62%,var(--surface))');
+    }
+  }
 
   if (typeof GM_registerMenuCommand === 'function') {
     GM_registerMenuCommand(L('blMenu') + (prefs.bitlist ? 'ON' : 'OFF'), () => {
@@ -1166,20 +2445,35 @@ body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
     if (prefs.theme === 'auto') return mq && mq.matches ? 'dark' : 'light';
     return prefs.theme;
   }
-    const FONT_STACKS = {
-    sans: '"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif',
-    serif: 'Georgia,"Times New Roman",Times,serif',
-    mono: 'ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace',
-    verdana: 'Verdana,Geneva,Tahoma,sans-serif',
-    trebuchet: '"Trebuchet MS","Lucida Grande","Lucida Sans Unicode",Tahoma,sans-serif',
-    palatino: '"Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif',
-    casual: '"Comic Sans MS","Comic Neue","Chalkboard SE",cursive,sans-serif'
+  const FONT_STACKS = {
+    jakarta: '"Plus Jakarta Sans","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif',
+    dmsans: '"DM Sans","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif',
+    source: '"Source Serif 4",Georgia,"Times New Roman",Times,serif',
+    plexmono: '"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace',
+    patrick: '"Patrick Hand","Comic Sans MS","Comic Neue",cursive,sans-serif',
+    fredoka: '"Fredoka","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif',
+    playfair: '"Playfair Display",Georgia,"Times New Roman",Times,serif'
   };
+  const FONT_GOOGLE_URL = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=Source+Serif+4:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Patrick+Hand&family=Fredoka:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap';
+  const FONT_LINK_ID = 'btx-fonts';
+
+  function ensureFonts() {
+    if (document.getElementById(FONT_LINK_ID)) return;
+    const link = document.createElement('link');
+    link.id = FONT_LINK_ID;
+    link.rel = 'stylesheet';
+    link.href = FONT_GOOGLE_URL;
+    link.crossOrigin = 'anonymous';
+    (document.head || document.documentElement).appendChild(link);
+  }
   // Applies theme, accent, font and layout preferences to the page
   function applyPrefs() {
     const root = document.documentElement;
     root.setAttribute('data-theme', resolvedTheme());
-    root.setAttribute('data-accent', prefs.accent);
+    root.setAttribute('data-accent', 'bitcointalk');
+    root.setAttribute('data-bg', 'default');
+    root.setAttribute('data-pal', prefs.pal || 'bitcointalk');
+          applyColors();
     [['ui', prefs.fsUi, prefs.ffUi], ['ct', prefs.fsPost, prefs.ffPost], ['cd', prefs.fsCard, prefs.ffCard]].forEach(([k, s, f]) => {
       root.style.setProperty('--btx-fs-' + k, String((s || 100) / 100));
       if (FONT_STACKS[f]) root.style.setProperty('--btx-ff-' + k, FONT_STACKS[f]);
@@ -1194,6 +2488,7 @@ body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
     if (m) m.setAttribute('content', resolvedTheme() === 'dark' ? '#12131a' : (prefs.accent === 'white' ? '#f4f3fa' : '#E5E5E8'));
     const tb = document.getElementById('btx-theme-btn');
     if (tb) { tb.innerHTML = ''; tb.append(icon(resolvedTheme() === 'dark' ? 'sun' : 'moon')); }
+    if ([prefs.ffUi, prefs.ffPost, prefs.ffCard].some(f => FONT_STACKS[f])) ensureFonts();
   }
 
   // Updates one preference, saves it and re-applies all preferences
@@ -1269,7 +2564,7 @@ body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
 
     const ffSeg = h('div', { class: 'btx-seg', style: 'grid-template-columns:repeat(4,1fr)' });
     const markFf = () => ffSeg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x.getAttribute('data-v') === curFf()));
-    [['default', L('fontDefault')], ['sans', L('fontSans')], ['serif', L('fontSerif')], ['mono', L('fontMono')], ['verdana', 'Verdana'], ['trebuchet', 'Trebuchet'], ['palatino', 'Palatino'], ['casual', 'Casual']].forEach(([v, label]) => {
+    [['default', L('fontDefault')], ['jakarta', 'Plus Jakarta Sans'], ['dmsans', 'DM Sans'], ['source', 'Source Serif'], ['plexmono', 'IBM Plex Mono'], ['patrick', 'Patrick Hand'], ['fredoka', 'Fredoka'], ['playfair', 'Playfair Display']].forEach(([v, label]) => {
       ffSeg.append(h('button', { class: curFf() === v ? 'on' : '', 'data-v': v, onclick: () => {
         tgts().forEach((t) => setPref('ff' + SUF[t], v));
         markFf();
@@ -1302,11 +2597,83 @@ body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
         L('backOrig')))
     ]);
     const langS = sheetOf('btx-lang', L('language'), h('div', { class: 'btx-row' }, langSeg));
-    const colorS = sheetOf('btx-color', L('accent'), h('div', { class: 'btx-row' }, swatches));
+    const bgSw = h('div', { class: 'btx-swatches btx-bgsw' });
+    BG_PRESETS.forEach(([v, light, dark, label]) => {
+      const b = h('button', {
+        class: 'btx-sw' + (prefs.bg === v ? ' on' : ''),
+        style: 'background:linear-gradient(135deg,' + light + ' 50%,' + dark + ' 50%)',
+        'aria-label': label, title: label,
+        onclick: () => {
+          setPref('bg', v);
+          bgSw.querySelectorAll('button').forEach((x) => x.classList.remove('on'));
+          b.classList.add('on');
+        }
+      });
+      bgSw.append(b);
+    });
+    const colorS = sheetOf('btx-color', LANG === 'id' ? 'Warna' : 'Colors', [
+      h('div', { class: 'btx-row' }, h('span', { class: 'lbl' }, L('accent')), swatches),
+      h('div', { class: 'btx-row' }, h('span', { class: 'lbl' }, LANG === 'id' ? 'Latar belakang' : 'Background'), bgSw)
+    ]);
     const fontS = sheetOf('btx-font', L('fontTitle'), [
       h('div', { class: 'btx-row' }, h('span', { class: 'lbl' }, L('fontTarget')), fxSeg),
       h('div', { class: 'btx-row' }, h('span', { class: 'lbl' }, L('fontSize') + ' ', fsVal), fsRange),
       h('div', { class: 'btx-row' }, h('span', { class: 'lbl' }, L('fontFamily')), ffSeg)
+    ]);
+
+    const palBox = h('div', { class: 'btx-pal' });
+    PALETTES.forEach(([v, label, mode, c1, c2, c3]) => {
+      const b = h('button', {
+        class: 'btx-palbtn' + (prefs.pal === v ? ' on' : ''), 'aria-label': label, title: label,
+        onclick: () => {
+          setPref('pal', v);
+          if (mode) setPref('theme', mode);
+          setPref('accC', 'default');
+          setPref('txtC', 'default');
+          accRow.refresh();
+          txtRow.refresh();
+          palBox.querySelectorAll('button').forEach((x) => x.classList.remove('on'));
+          b.classList.add('on');
+          main.overlay.querySelectorAll('.btx-seg button').forEach((x, i) =>
+            x.classList.toggle('on', ['auto', 'light', 'dark'][i] === prefs.theme));
+        }
+      },
+      h('span', { class: 'btx-palsw', style: 'background:linear-gradient(135deg,' + c1 + ' 0 34%,' + c2 + ' 34% 67%,' + c3 + ' 67%)' }),
+      h('span', { class: 'n' }, label));
+      palBox.append(b);
+    });
+
+    // Builds a swatch row (presets + custom picker + reset) for the accent or the text color
+    const swatchRow = (list, key) => {
+      const row = h('div', { class: 'btx-swatches btx-csw' });
+      const picker = h('input', { type: 'color', class: 'btx-cpick', 'aria-label': L('customColor'), title: L('customColor'),
+        value: isHex(prefs[key]) ? prefs[key] : '#888888' });
+      const mark = () => {
+        row.querySelectorAll('button[data-v]').forEach((x) => x.classList.toggle('on', x.getAttribute('data-v') === prefs[key]));
+        picker.classList.toggle('on', isHex(prefs[key]));
+      };
+      row.append(h('button', { class: 'btx-sw btx-sw-default', 'data-v': 'default', title: L('colorDefault'), 'aria-label': L('colorDefault'),
+        onclick: () => { setPref(key, 'default'); mark(); } }, '\u00D7'));
+      list.forEach(([v, label, light, dark]) => {
+        row.append(h('button', {
+          class: 'btx-sw', 'data-v': v, title: label, 'aria-label': label,
+          style: 'background:linear-gradient(135deg,' + light + ' 50%,' + dark + ' 50%)',
+          onclick: () => { setPref(key, v); mark(); }
+        }));
+      });
+      picker.addEventListener('input', () => { setPref(key, picker.value); mark(); });
+      row.append(picker);
+      mark();
+      row.refresh = mark;
+      return row;
+    };
+    const accRow = swatchRow(ACCENTS, 'accC');
+    const txtRow = swatchRow(TEXT_COLORS, 'txtC');
+
+    const palS = sheetOf('btx-pal', L('colors'), [
+      h('div', { class: 'btx-row' }, h('span', { class: 'lbl' }, L('theme')), palBox),
+      h('div', { class: 'btx-row' }, h('span', { class: 'lbl' }, L('accent')), accRow),
+      h('div', { class: 'btx-row' }, h('span', { class: 'lbl' }, L('textColor')), txtRow)
     ]);
 
     return {
@@ -1314,8 +2681,8 @@ body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
       open: main.open,
       openLang: langS.open,
       openFont: fontS.open,
-      openColor: colorS.open,
-      others: [langS.overlay, fontS.overlay, colorS.overlay]
+      openColor: palS.open,
+      others: [langS.overlay, fontS.overlay, palS.overlay]
     };
   }
 
@@ -1334,11 +2701,26 @@ body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
     );
   }
 
+  // Indonesian labels for the main forum menu
+  const NAV_ID = {
+    'home': 'Beranda', 'help': 'Bantuan', 'search': 'Cari', 'profile': 'Profil',
+    'my messages': 'Pesan Saya', 'members': 'Member', 'more': 'Lainnya',
+    'logout': 'Keluar', 'login': 'Masuk', 'register': 'Daftar',
+    'calendar': 'Kalender', 'admin': 'Admin', 'moderate': 'Moderasi'
+  };
+  // Translates one menu label and keeps a trailing counter like "[2]"
+  const navLabel = (s) => {
+    if (LANG !== 'id') return s;
+    const m = (s || '').trim().match(/^(.*?)(\s*\[\d+\])?$/);
+    const t = NAV_ID[m[1].toLowerCase()];
+    return t ? t + (m[2] || '') : s;
+  };
+
   // Builds the main navigation chips
   function navEl(head) {
     if (!head.nav.length) return null;
     return h('nav', { class: 'btx-nav', 'aria-label': L('mainNav') },
-      head.nav.map((n) => h('a', { class: n.active ? 'on' : '', href: n.href }, n.name)));
+      head.nav.map((n) => h('a', { class: n.active ? 'on' : '', href: n.href }, navLabel(n.name))));
   }
 
   // Builds the quick link row (unread, replies, patrol, watchlist)
@@ -1435,7 +2817,7 @@ body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
     return wrap;
   }
 
-  // Builds the full pager with first, previous, next, last and page jump
+  // Builds a one-line pager: a long page list on desktop, a short one on mobile, jump box always visible
   function buildPager(items, strict) {
     if (!items) return null;
     const cur = items.find((i) => i.current);
@@ -1443,36 +2825,46 @@ body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
     const nums = items.filter((i) => i.href && /^\d+$/.test(i.label));
     const total = Math.max(curN, ...nums.map((i) => +i.label));
     if (total <= 1) return null;
-    const sample = nums.find((i) => +i.label > 1 && /(?:board|topic)=\d+\.\d+/.test(i.href));
+
+    // supports board=1.50, topic=1.20 and start=15 (profile Show Posts)
+    const RE = /((?:board|topic)=\d+\.|[;?&]start=)(\d+)/;
+    const sample = nums.find((i) => +i.label > 1 && RE.test(i.href));
     if (!sample) return strict ? null : pagerEl(items);
 
-    const off = parseInt(sample.href.match(/(?:board|topic)=\d+\.(\d+)/)[1], 10);
+    const off = parseInt(sample.href.match(RE)[2], 10);
     const per = off / (+sample.label - 1);
-    const url = (n) => sample.href.replace(/((?:board|topic)=\d+\.)\d+/, (m, a) => a + Math.round((n - 1) * per));
+    const url = (n) => sample.href.replace(RE, (m, a) => a + Math.round((n - 1) * per));
 
-    const btn = (sym, key, n, disabled) => disabled
-      ? h('span', { class: 'pg nav dis', 'aria-disabled': 'true' }, sym, h('span', { class: 't' }, L(key)))
-      : h('a', { class: 'pg nav', href: url(n), title: L(key), 'aria-label': L(key) }, sym, h('span', { class: 't' }, L(key)));
+    const btn = (sym, key, n, far) => h('a', {
+      class: 'pg nav' + (far ? ' far' : ''), href: url(n), title: L(key), 'aria-label': L(key)
+    }, sym);
+
+    // one group of page buttons; win = pages shown on each side of the current page
+    const group = (cls, win, ends) => {
+      const g = h('div', { class: 'btx-pgs ' + cls });
+      if (curN > 1) g.append(btn('\u00AB', 'first', 1, true), btn('\u2039', 'prev', curN - 1, false));
+      const set = new Set([1, total]);
+      for (let k = 1; k <= ends; k++) { set.add(k); set.add(total - k + 1); }
+      for (let n = curN - win; n <= curN + win; n++) set.add(n);
+      const show = [...set].filter((n) => n >= 1 && n <= total).sort((a, b) => a - b);
+      show.forEach((n, i) => {
+        if (i && n - show[i - 1] > 1) g.append(h('span', { class: 'gap' }, '\u2026'));
+        g.append(n === curN
+          ? h('span', { class: 'pg on', 'aria-current': 'page' }, String(n))
+          : h('a', { class: 'pg', href: url(n) }, String(n)));
+      });
+      if (curN < total) g.append(btn('\u203A', 'next', curN + 1, false), btn('\u00BB', 'last', total, true));
+      return g;
+    };
 
     const wrap = h('nav', { class: 'btx-pager btx-pager2', 'aria-label': L('pages') });
-    const first = curN <= 1, last = curN >= total;
-    wrap.append(btn('\u00AB', 'first', 1, first), btn('\u2039', 'prev', curN - 1, first));
+    wrap.append(group('m', 1, 1), group('d', 3, 2));
 
-    const show = [...new Set([1, curN - 1, curN, curN + 1, total])].filter((n) => n >= 1 && n <= total).sort((a, b) => a - b);
-    show.forEach((n, i) => {
-      if (i && n - show[i - 1] > 1) wrap.append(h('span', { class: 'gap' }, '\u2026'));
-      wrap.append(n === curN
-        ? h('span', { class: 'pg on', 'aria-current': 'page' }, String(n))
-        : h('a', { class: 'pg', href: url(n) }, String(n)));
-    });
-
-    wrap.append(btn('\u203A', 'next', curN + 1, last), btn('\u00BB', 'last', total, last));
-
-    items.filter((i) => i.href && !/^\d+$/.test(i.label) && !/^[\u00AB\u00BB]+$/.test(i.label))
-      .forEach((i) => wrap.append(h('a', { class: 'pg', href: i.href }, i.label)));
-
-    if (total > 5) {
-      const input = h('input', { type: 'number', min: '1', max: String(total), placeholder: curN + ' / ' + total, inputmode: 'numeric', 'aria-label': L('pages') });
+    if (total > 3) {
+      const input = h('input', {
+        type: 'number', min: '1', max: String(total), placeholder: curN + '/' + total,
+        inputmode: 'numeric', enterkeyhint: 'go', 'aria-label': L('pages')
+      });
       wrap.append(h('form', { class: 'btx-jump', onsubmit: (e) => {
         e.preventDefault();
         const v = Math.min(total, Math.max(1, parseInt(input.value, 10) || curN));
@@ -1496,7 +2888,12 @@ body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
           h('span', { class: 'pg on', 'aria-current': 'page' }, m ? m[1] : '1'));
       }
       if (!pg) return;
-      keep.forEach((a) => { a.classList.add('pg'); pg.append(a); });
+      keep.forEach((a) => {
+        a.classList.add('pg');
+        const grps = pg.querySelectorAll('.btx-pgs');
+        if (grps.length) grps.forEach((g, i) => g.append(i ? a.cloneNode(true) : a));
+        else pg.append(a);
+      });
       td.classList.add('btx-pgcell');
       const bar = td.closest('table');
       if (bar) bar.classList.add('btx-pgbar');
@@ -1504,11 +2901,11 @@ body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
     });
   }
 
-  // Scrolls each pager so the current page is centered
+  // Scrolls each page list so the current page is centered
   function centerPagers() {
-    document.querySelectorAll('.btx-pager').forEach((p) => {
+    document.querySelectorAll('.btx-pgs, .btx-pager').forEach((p) => {
       const on = p.querySelector('.on');
-      if (on) p.scrollLeft = on.offsetLeft - p.clientWidth / 2 + on.offsetWidth / 2;
+      if (on && p.scrollWidth > p.clientWidth) p.scrollLeft = on.offsetLeft - p.clientWidth / 2 + on.offsetWidth / 2;
     });
   }
 
@@ -1568,6 +2965,39 @@ body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
     statTipEl.style.top = Math.round(top) + 'px';
     statTipSrc = el;
     statTipTimer = setTimeout(hideStatTip, 2500);
+  }
+
+  // Wraps the +N / -N parts of a trust score: + is always green, - is always red
+  function paintTrust(root) {
+    if (!root) return;
+    const re = /([+\-\u2212]\s?\d+)/g;
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    let n;
+    while ((n = w.nextNode())) { if (/[+\-\u2212]\s?\d/.test(n.nodeValue)) nodes.push(n); }
+    nodes.forEach((tn) => {
+      if (tn.parentElement && tn.parentElement.closest('.btx-tr-pos, .btx-tr-neg')) return;
+      const frag = document.createDocumentFragment();
+      tn.nodeValue.split(re).forEach((part) => {
+        if (!part) return;
+        if (/^\+\s?\d/.test(part)) frag.append(h('span', { class: 'btx-tr-pos' }, part));
+        else if (/^[-\u2212]\s?\d/.test(part)) {
+          if (parseInt(part.replace(/\D/g, ''), 10) > 0) frag.append(h('span', { class: 'btx-tr-neg' }, part));
+          else frag.append(document.createTextNode(part));
+        }
+        else frag.append(document.createTextNode(part));
+      });
+      tn.parentNode.replaceChild(frag, tn);
+    });
+  }
+  const paintTrustIn = (scope) => scope.querySelectorAll('.btx-pf-tile.trust .val').forEach(paintTrust);
+
+  // Builds the value of one poster stat; Trust keeps its own green/red colors
+  function statVal(s) {
+    const isTrust = /^trust$/i.test(s.k);
+    const b = h('b', { style: !isTrust && s.color ? 'color:' + s.color : null }, s.v);
+    if (isTrust) paintTrust(b);
+    return b;
   }
 
   // Builds the poster info card from clones of the original poster info
@@ -1662,7 +3092,7 @@ body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
         stars.length > 0 && h('div', { class: 'btx-pi-stars' }, stars),
         stats.length > 0 && h('div', { class: 'btx-pi-stats' + (stats.length > 5 ? ' many' : '') },
           stats.map((s) => h('span', { class: 'btx-pi-stat' + (prefs.pabbr ? ' ab' : ''), title: s.k, 'data-full': s.k, onclick: prefs.pabbr ? toggleStatTip : null },
-            h('em', {}, h('span', { class: 'full' }, s.k), prefs.pabbr && h('span', { class: 'abv' }, statAbbr(s.k))), h('b', { style: s.color ? 'color:' + s.color : null }, s.v))))
+            h('em', {}, h('span', { class: 'full' }, s.k), prefs.pabbr && h('span', { class: 'abv' }, statAbbr(s.k))), statVal(s))))
       ),
       extra.length > 0 && h('div', { class: 'btx-pi-extra' + (extra.length > 2 ? ' many' : '') }, extra),
       acts.length > 0 && h('div', { class: 'btx-pi-acts' }, acts)
@@ -2018,6 +3448,655 @@ body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
     window.addEventListener('load', later);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(later);
     [300, 1200, 3000].forEach((ms) => setTimeout(refit, ms));
+  }
+
+  const PF_INFO = [
+    ['Date Registered', 'pfRegistered', 'text'],
+    ['Last Active', 'pfLastActive', 'time'],
+    ['Local Time', 'pfLocalTime', 'text'],
+    ['Website', 'pfWebsite', 'node'],
+    ['Gender', 'pfGender', 'text'],
+    ['Age', 'pfAge', 'text'],
+    ['Location', 'pfLocation', 'text'],
+    ['Email', 'pfEmail', 'node'],
+    ['ICQ', null, 'text'],
+    ['AIM', null, 'text'],
+    ['MSN', null, 'text'],
+    ['YIM', null, 'text']
+  ];
+  const PF_SKIP = ['name', 'posts', 'activity', 'merit', 'position', 'trust', 'current status'];
+
+  // Returns the profile section name from the page address
+  function profileSa() {
+    const m = location.search.match(/[;?&]sa=([^;&]+)/);
+    return m ? m[1] : 'summary';
+  }
+
+  // Parses the profile sidebar links into view and edit groups
+  function parseProfileMenu() {
+    const cat = [...document.querySelectorAll('#bodyarea td.catbg')].find((td) => /^Profile Info$/i.test(txt(td)));
+    const sideTable = cat && cat.closest('table');
+    const sideCell = sideTable && sideTable.closest('td');
+    const layout = sideCell && sideCell.closest('table');
+    if (!sideTable || !sideCell || !layout) return null;
+    let group = 'view';
+    const items = [];
+    sideTable.querySelectorAll('tr').forEach((tr) => {
+      const head = tr.querySelector('td.catbg');
+      if (head) { group = /^Profile Info$/i.test(txt(head)) ? 'view' : 'edit'; return; }
+      tr.querySelectorAll('a[href*="action=profile"]').forEach((a) => {
+        const m = a.href.match(/[;?&]sa=([^;&]+)/);
+        items.push({ name: txt(a), href: a.href, sa: m ? m[1] : '', group });
+      });
+    });
+    return { layout, sideCell, items };
+  }
+
+  // Parses the profile summary page into structured data
+  function parseProfileSummary() {
+    const sumRow = [...document.querySelectorAll('#bodyarea tr.titlebg')].find((tr) => /^Summary\b/i.test(txt(tr)));
+    if (!sumRow) return null;
+    const table = sumRow.closest('table');
+    const infoTable = table.querySelector('td.windowbg > table');
+    if (!infoTable) return null;
+
+    const fields = [];
+    infoTable.querySelectorAll('tr').forEach((tr) => {
+      if (tr.closest('.signature') || tr.children.length !== 2) return;
+      const lab = tr.children[0].querySelector(':scope > b');
+      if (!lab) return;
+      const a = lab.querySelector('a');
+      fields.push({ key: txt(lab).replace(/:\s*$/, '').trim(), cell: tr.children[1], href: a ? a.href : '', text: txt(tr.children[1]) });
+    });
+    const get = (k) => fields.find((f) => f.key.toLowerCase() === k.toLowerCase()) || null;
+    const val = (k) => { const f = get(k); return f ? f.text : ''; };
+
+    const st = get('Current Status');
+    const pmA = st && st.cell.querySelector('a[href*="action=pm"]');
+    const avatar = table.querySelector('td.windowbg > img.avatar');
+    const extra = [];
+    if (avatar && avatar.parentElement) {
+      [...avatar.parentElement.childNodes].forEach((n) => {
+        if (n === avatar || (n.nodeType === 1 && n.tagName === 'BR') || (n.nodeType === 3 && !n.textContent.trim())) return;
+        extra.push(n.cloneNode(true));
+      });
+    }
+
+    const addRow = [...table.querySelectorAll('tr.titlebg')].find((tr) => /Additional/i.test(txt(tr)));
+    const addTr = addRow && addRow.nextElementSibling;
+    const links = addTr ? [...addTr.querySelectorAll('a')].map((a) => ({ name: txt(a).replace(/\.$/, ''), href: a.href })) : [];
+    const postsLink = links.find((l) => /sa=showPosts/.test(l.href) && !/threads/.test(l.href));
+    const sig = infoTable.querySelector('div.signature');
+    const merit = get('Merit');
+    const trust = get('Trust');
+
+    return {
+      table,
+      fields,
+      sig: sig && sigHasContent(sig) ? sig : null,
+      name: val('Name'),
+      position: val('Position'),
+      posts: val('Posts'),
+      activity: val('Activity'),
+      merit: val('Merit'),
+      meritHref: merit ? merit.href : '',
+      trustHref: trust ? trust.href : '',
+      hasStatus: !!st,
+      online: !!(st && st.cell.querySelector('img[src*="useron"]')),
+      pm: pmA ? pmA.href : '',
+      avatar,
+      extra,
+      links,
+      postsHref: postsLink ? postsLink.href : ''
+    };
+  }
+
+  // Builds the hero card, number tiles and information list
+  function profileTop(d) {
+    const nodeOf = (f) => [...f.cell.childNodes].map((n) => n.cloneNode(true));
+    const rows = [];
+    const addRow = (label, content) => rows.push(h('div', { class: 'btx-pf-row' }, h('span', { class: 'k' }, label), h('span', { class: 'v' }, content)));
+    const used = PF_SKIP.slice();
+    PF_INFO.forEach(([key, lk, type]) => {
+      used.push(key.toLowerCase());
+      const f = d.fields.find((x) => x.key.toLowerCase() === key.toLowerCase());
+      if (!f || !f.text) return;
+      addRow(lk ? L(lk) : key, type === 'node' ? nodeOf(f) : (type === 'time' ? idTime(f.text) : f.text));
+    });
+    d.fields.forEach((f) => {
+      if (!f.text || used.includes(f.key.toLowerCase())) return;
+      addRow(f.key, f.text);
+    });
+
+    const numOr = (v) => (/^\d+$/.test(v) ? num(v) : v);
+    const tile = (label, content, href, cls) => h(href ? 'a' : 'div', { class: 'btx-pf-tile' + (cls ? ' ' + cls : ''), href: href || null },
+      h('small', {}, label), h('span', { class: 'val' }, content));
+    const trust = d.fields.find((x) => x.key.toLowerCase() === 'trust');
+    const tiles = [
+      d.posts && tile(L('pfPosts'), numOr(d.posts)),
+      d.activity && tile(L('pfActivity'), numOr(d.activity)),
+      d.merit && tile(L('pfMerit'), numOr(d.merit), d.meritHref),
+      trust && trust.text && tile(L('pfTrust'), nodeOf(trust), d.trustHref, 'trust')
+    ].filter(Boolean);
+
+    const hero = h('section', { class: 'btx-pf-hero' },
+      d.avatar && h('div', { class: 'btx-pf-av' }, d.avatar.cloneNode(true)),
+      h('div', { class: 'btx-pf-id' },
+        h('h1', { class: 'btx-pf-name' }, d.name),
+        d.position && h('div', { class: 'btx-pf-rank' }, d.position),
+        d.hasStatus && h('div', { class: 'btx-pf-status' }, h('span', { class: 'dot' + (d.online ? ' on' : '') }), d.online ? L('pfOnline') : L('pfOffline')),
+        d.extra.length > 0 && h('div', { class: 'btx-pf-text' }, d.extra.map((n) => n.cloneNode(true)))
+      ),
+      (d.pm || d.postsHref) && h('div', { class: 'btx-pf-acts' },
+        d.pm && h('a', { class: 'btx-btn primary', href: d.pm }, L('pfMessage')),
+        d.postsHref && h('a', { class: 'btx-btn', href: d.postsHref }, L('pfShowPosts')))
+    );
+
+    return [
+      hero,
+      tiles.length > 0 && h('div', { class: 'btx-pf-tiles' }, tiles),
+      rows.length > 0 && h('section', { class: 'btx-pf-card' }, rows)
+    ].filter(Boolean);
+  }
+
+  // Builds the activity links card and the settings card
+  function profileBottom(d, menu) {
+    const labelFor = (l) => (/sa=statPanel/.test(l.href) ? L('pfStats') : (/threads/.test(l.href) ? L('pfTopics') : (/sa=showPosts/.test(l.href) ? L('pfLastPosts') : l.name)));
+    const linkRow = (label, href) => h('a', { class: 'btx-pf-link', href }, h('span', { class: 't' }, label), icon('next'));
+    const out = [];
+    if (d.links.length) {
+      out.push(h('section', { class: 'btx-pf-card' }, h('h2', { class: 'btx-pf-h' }, L('pfLinksTitle')), d.links.map((l) => linkRow(labelFor(l), l.href))));
+    }
+    const edit = menu ? menu.items.filter((i) => i.group === 'edit') : [];
+    if (edit.length) {
+      out.push(h('section', { class: 'btx-pf-card' }, h('h2', { class: 'btx-pf-h' }, L('pfSettings')), edit.map((i) => linkRow(menuLabel(i.name), i.href))));
+    }
+    return out;
+  }
+
+  // Replaces the profile summary page with the modern profile layout
+  function buildProfilePage(menu) {
+    const d = parseProfileSummary();
+    if (!d) return false;
+    const layout = (menu && menu.layout) || (d.table.parentElement && d.table.parentElement.closest('table'));
+    if (!layout || !layout.parentNode) return false;
+
+    const top = h('div', { class: 'btx-pf-main' });
+    const bottom = h('div', { class: 'btx-pf-side' });
+    const sigCard = d.sig ? h('section', { class: 'btx-pf-card btx-pf-sig' }, h('h2', { class: 'btx-pf-h' }, L('pfSignature')), d.sig) : null;
+    top.replaceChildren(...profileTop(d));
+    bottom.replaceChildren(...profileBottom(d, menu));
+    layout.parentNode.insertBefore(h('div', { id: 'btx-pf', class: 'btx-pf' }, top, sigCard, bottom), layout);
+    layout.classList.add('btx-hide');
+
+    let mo = null, queued = false;
+    const redraw = () => {
+      queued = false;
+      try {
+        const nd = parseProfileSummary();
+        if (nd) {
+          top.replaceChildren(...profileTop(nd));
+          bottom.replaceChildren(...profileBottom(nd, menu));
+        }
+      } catch (e) {}
+      if (mo) mo.takeRecords();
+    };
+    mo = new MutationObserver(() => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(redraw);
+    });
+    mo.observe(d.table, { childList: true, subtree: true, characterData: true });
+    return true;
+  }
+
+  // Sets up the modern profile summary layout and stacks the profile layout on mobile
+  function setupProfile() {
+    if (!/[?&;]action=profile(?![\w])/.test(location.search)) return;
+    const menu = parseProfileMenu();
+    if (menu) menu.layout.classList.add('btx-pf-layout');
+    if (profileSa() === 'summary') safe(() => buildProfilePage(menu));
+  }
+
+  // Parses the show posts / topics-started page rows
+  function parseShowPosts() {
+    const body = document.getElementById('bodyarea');
+    if (!body) return null;
+    const items = [];
+    let pager = null;
+    body.querySelectorAll('table[width="85%"]').forEach((outer) => {
+      const cat3 = outer.querySelector('td.catbg3');
+      if (cat3 && /Pages:/.test(txt(cat3))) {
+        if (!pager) pager = parsePager(cat3);
+        return;
+      }
+      const headRow = outer.querySelector('table.bordercolor tr.titlebg2');
+      if (!headRow) return;
+      const tds = headRow.children;
+      if (tds.length < 3) return;
+      const num = txt(tds[0]);
+      const links = [...tds[1].querySelectorAll('a')];
+      const topicLink = links[links.length - 1];
+      if (!topicLink) return;
+      const crumbs = links.slice(0, -1).map(a => ({ name: txt(a), href: a.href }));
+      const date = txt(tds[2]).replace(/^on:\s*/i, '');
+      const postDiv = outer.querySelector('div.post');
+      let actions = null;
+      if (postDiv) actions = outer.querySelector('td.windowbg2[align="right"] span.middletext');
+      items.push({
+        num, crumbs,
+        title: txt(topicLink), titleHref: topicLink.href,
+        date, body: postDiv, actions
+      });
+    });
+    return items.length ? { items, pager } : null;
+  }
+
+  // Builds the right-hand profile menu shared by Show Posts, Topics Started and Stats pages.
+  // The page that is currently open is hidden, every other page is listed.
+  function profileSideCards(menu, cur) {
+    const side = h('aside', { class: 'btx-pp-side' });
+    if (!menu) return side;
+    const find = (re) => menu.items.find((i) => re.test(i.href));
+    const sum = find(/sa=summary/);
+    const posts = find(/sa=showPosts/);
+    const stat = find(/sa=statPanel/);
+    const base = posts ? posts.href.replace(/;threads\b/, '') : '';
+
+    const all = [
+      { key: 'summary', label: LANG === 'id' ? 'Ringkasan' : 'Summary', href: sum ? sum.href : '' },
+      { key: 'posts', label: L('pfLastPosts'), href: base },
+      { key: 'threads', label: L('pfTopics'), href: base ? base + ';threads' : '' },
+      { key: 'stats', label: L('pfStats'), href: stat ? stat.href : '' }
+    ].filter((x) => x.href && x.key !== cur);
+
+    const linkRow = (label, href) => h('a', { class: 'btx-pf-link', href },
+      h('span', { class: 't' }, label), icon('next'));
+
+    if (all.length) {
+      side.append(h('section', { class: 'btx-pf-card' },
+        h('h2', { class: 'btx-pf-h' }, L('pfLinksTitle')),
+        all.map((x) => linkRow(x.label, x.href))));
+    }
+    const edit = menu.items.filter((i) => i.group === 'edit');
+    if (edit.length) {
+      side.append(h('section', { class: 'btx-pf-card' },
+        h('h2', { class: 'btx-pf-h' }, L('pfSettings')),
+        edit.map((i) => linkRow(menuLabel(i.name), i.href))));
+    }
+    return side;
+  }
+
+    // Replaces the profile show-posts / topics-started page with a modern card layout
+  function setupShowPosts() {
+    if (!/[?&;]action=profile(?![\w])/.test(location.search)) return;
+    if (profileSa() !== 'showPosts') return;
+    const bodyarea = document.getElementById('bodyarea');
+    if (!bodyarea || bodyarea.querySelector('.btx-pp')) return;
+
+    const parsed = parseShowPosts();
+    if (!parsed) return;
+    const menu = parseProfileMenu();
+    const isThreads = /[?&;]sa=showPosts;threads(?:[;&]|$)/.test(location.search);
+
+    const side = profileSideCards(menu, isThreads ? 'threads' : 'posts');
+
+    // Top row (full width): title + pager
+    const pgTop = parsed.pager ? buildPager(parsed.pager) : null;
+    const top = h('div', { class: 'btx-pp-top' },
+      h('h1', { class: 'btx-pp-h1' }, isThreads ? L('pfTopics') : L('pfLastPosts')),
+      pgTop);
+
+    // Post cards
+    const list = h('div', { class: 'btx-pp-list' });
+    parsed.items.forEach((it) => {
+      const crumbs = h('div', { class: 'btx-pp-crumbs' });
+      it.crumbs.forEach((c, i) => {
+        if (i) crumbs.append(h('span', { class: 'sep' }, '/'));
+        crumbs.append(h('a', { href: c.href }, c.name));
+      });
+
+      const card = h('article', { class: 'btx-pp-item' },
+        h('div', { class: 'btx-pp-head' },
+          h('span', { class: 'btx-pp-num' }, it.num),
+          h('div', { class: 'btx-pp-hm' },
+            crumbs,
+            it.title && h('a', { class: 'btx-pp-t2', href: it.titleHref }, it.title)),
+          it.date && h('span', { class: 'btx-pp-date' }, idTime(it.date))));
+
+      if (it.body) card.append(h('div', { class: 'btx-pp-body' }, it.body.cloneNode(true)));
+
+      if (it.actions) {
+        const acts = h('div', { class: 'btx-pp-acts' });
+        it.actions.querySelectorAll('a').forEach((a) => acts.append(a.cloneNode(true)));
+        if (acts.children.length) card.append(acts);
+      }
+      list.append(card);
+    });
+
+    const pgBot = parsed.pager ? buildPager(parsed.pager) : null;
+    const main = h('div', { class: 'btx-pp-main' }, list, pgBot);
+
+    bodyarea.querySelectorAll(':scope > table').forEach((t) => { t.style.display = 'none'; });
+    bodyarea.prepend(h('div', { class: 'btx-pp' }, top, main, side));
+  }
+
+  // Replaces the profile "Show Stats" page with the modern layout (sidebar + content card)
+  function setupStatPanel() {
+    if (!/[?&;]action=profile(?![\w])/.test(location.search)) return;
+    if (profileSa() !== 'statPanel') return;
+    const bodyarea = document.getElementById('bodyarea');
+    if (!bodyarea || bodyarea.querySelector('.btx-pp')) return;
+    const menu = parseProfileMenu();
+    if (!menu) return;
+    const content = menu.sideCell.nextElementSibling;
+    if (!content) return;
+
+    const side = profileSideCards(menu, 'stats');
+    const body = h('div', { class: 'btx-pp-content' });
+    while (content.firstChild) body.append(content.firstChild);
+    const top = h('div', { class: 'btx-pp-top' }, h('h1', { class: 'btx-pp-h1' }, L('pfStats')));
+
+    menu.layout.classList.add('btx-hide');
+    menu.layout.parentNode.insertBefore(
+      h('div', { class: 'btx-pp' }, top, h('div', { class: 'btx-pp-main' }, body), side), menu.layout);
+  }
+
+  // Mobile only: collapses the "Merited by ..." list into a compact chip with a tap-to-open list of names
+  let meritTip = null, meritSrc = null, meritBound = false;
+
+  // Hides the merit list popup
+  function hideMeritTip() {
+    if (meritTip) meritTip.style.display = 'none';
+    meritSrc = null;
+  }
+
+  // Shows the merit list popup under (or above) the chip, kept inside the screen
+  function showMeritTip(btn, users) {
+    if (meritTip && meritSrc === btn && meritTip.style.display === 'block') { hideMeritTip(); return; }
+    if (!meritTip) {
+      meritTip = h('div', { id: 'btx-merit-tip', role: 'tooltip' });
+      document.body.append(meritTip);
+    }
+    if (!meritBound) {
+      meritBound = true;
+      document.addEventListener('click', (ev) => {
+        if (!(ev.target.closest && (ev.target.closest('.btx-mchip') || ev.target.closest('#btx-merit-tip')))) hideMeritTip();
+      });
+      window.addEventListener('scroll', hideMeritTip, { passive: true });
+      window.addEventListener('resize', hideMeritTip);
+    }
+    meritTip.replaceChildren(...users.map((u) =>
+      h('a', { href: u.href }, u.name, h('b', {}, ' (' + u.n + ')'))));
+    meritTip.style.left = '0px';
+    meritTip.style.top = '0px';
+    meritTip.style.display = 'block';
+    const r = btn.getBoundingClientRect();
+    const vw = document.documentElement.clientWidth || window.innerWidth;
+    const vh = window.innerHeight;
+    const tw = meritTip.offsetWidth;
+    const th = meritTip.offsetHeight;
+    const left = Math.max(8, Math.min(r.left, vw - tw - 8));
+    const top = (r.bottom + 6 + th <= vh - 8) ? r.bottom + 6 : Math.max(8, r.top - th - 6);
+    meritTip.style.left = Math.round(left) + 'px';
+    meritTip.style.top = Math.round(top) + 'px';
+    meritSrc = btn;
+  }
+
+  // Finds every "Merited by" block in the thread and adds the compact mobile chip before it
+  function setupMerits() {
+    document.querySelectorAll('#bodyarea div.smalltext > i').forEach((i) => {
+      const box = i.parentElement;
+      if (!box || box.classList.contains('btx-merit-orig')) return;
+      if (box.closest('.post, .signature, .btx-pi')) return;
+      if (!/^\s*Merited by/i.test(i.textContent)) return;
+
+      const users = [];
+      let total = 0;
+      i.querySelectorAll('a[href*="action=profile"]').forEach((a) => {
+        const m = a.nextSibling && /\((\d+)\)/.exec(a.nextSibling.textContent || '');
+        const n = m ? parseInt(m[1], 10) : 1;
+        total += n;
+        users.push({ name: txt(a), href: a.href, n });
+      });
+      if (!users.length) return;
+
+      const label = LANG === 'id'
+        ? 'Merit: ' + total + ' \u2022 Diberi merit oleh: ' + users.length + ' user'
+        : 'Merit: ' + total + ' \u2022 Merited by: ' + users.length + ' users';
+      const chip = h('div', { class: 'btx-merit-sum' },
+        h('button', { type: 'button', class: 'btx-mchip', onclick: (e) => { e.stopPropagation(); showMeritTip(e.currentTarget, users); } }, label));
+      box.classList.add('btx-merit-orig');
+      box.parentNode.insertBefore(chip, box);
+    });
+  }
+
+  // Copies text to the clipboard (falls back to a hidden textarea)
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+    return new Promise((resolve, reject) => {
+      const t = document.createElement('textarea');
+      t.value = text;
+      t.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(t);
+      t.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      t.remove();
+      if (ok) resolve(); else reject(new Error('copy'));
+    });
+  }
+
+  // Adds a Copy button to the header of every [code] block
+  function setupCodeCopy() {
+    document.querySelectorAll('#bodyarea :is(.post, .btx-pp-body) .codeheader').forEach((hd) => {
+      const code = hd.nextElementSibling;
+      if (hd.classList.contains('btx-hascopy') || !code || !code.classList.contains('code')) return;
+      hd.classList.add('btx-hascopy');
+      const btn = h('button', { type: 'button', class: 'btx-copy', title: L('copy') }, L('copy'));
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const text = (code.innerText || code.textContent || '').replace(/\u00a0/g, ' ').replace(/\s+$/, '');
+        copyText(text).then(() => 'ok', () => 'fail').then((r) => {
+          btn.textContent = r === 'ok' ? L('copied') : L('copyFail');
+          btn.classList.toggle('ok', r === 'ok');
+          clearTimeout(btn._t);
+          btn._t = setTimeout(() => { btn.textContent = L('copy'); btn.classList.remove('ok'); }, 1600);
+        });
+      });
+      hd.append(btn);
+    });
+  }
+
+  // Indonesian labels for buttons that come straight from the forum markup
+  const BTN_ID = {
+    'previous topic': 'topik sebelumnya',
+    'next topic': 'topik berikutnya',
+    'reply': 'balas',
+    'watch': 'pantau',
+    'unwatch': 'berhenti pantau',
+    'notify': 'notifikasi',
+    'unnotify': 'matikan notifikasi',
+    'un-notify': 'matikan notifikasi',
+    'mark unread': 'tandai belum dibaca',
+    'print': 'cetak',
+    'send this topic': 'kirim topik ini',
+    'add poll': 'tambah polling',
+    'quote': 'kutip',
+    'modify': 'ubah',
+    'remove': 'hapus',
+    'report to moderator': 'laporkan ke moderator',
+    'all': 'semua'
+  };
+
+  // Translates forum button labels (thread bars, post buttons, pager "All") when Indonesian is active
+  function translateLegacyUi() {
+    if (LANG !== 'id') return;
+    const sel = [
+      '#bodyarea .btx-pgbar td.mirrortab_back a',
+      '#bodyarea .btx-pgbar td.maintab_back a',
+      '#bodyarea .btx-pgbar div.nav a',
+      '#bodyarea td.td_buttons a',
+      '#bodyarea .btx-pager2 a.pg:not(.nav)'
+    ].join(',');
+    document.querySelectorAll(sel).forEach((a) => {
+      const w = document.createTreeWalker(a, NodeFilter.SHOW_TEXT);
+      let n;
+      while ((n = w.nextNode())) {
+        const m = n.nodeValue.match(/^(\s*[\u00AB\u00BB]?\s*)(.*?)(\s*[\u00AB\u00BB]?\s*)$/);
+        if (!m) continue;
+        const tr = BTN_ID[m[2].toLowerCase()];
+        if (tr) n.nodeValue = m[1] + tr + m[3];
+      }
+    });
+  }
+
+  // Indonesian labels for forum menus read straight from the forum markup (profile menu)
+  const MENU_ID = {
+    'profile info': 'Info Profil',
+    'modify profile': 'Ubah Profil',
+    'summary': 'Ringkasan',
+    'show stats': 'Lihat Statistik',
+    'show posts': 'Lihat Posting',
+    'account related settings': 'Pengaturan Akun',
+    'forum profile information': 'Informasi Profil Forum',
+    'look and layout preferences': 'Tampilan dan Tata Letak',
+    'notifications and email': 'Notifikasi dan Email',
+    'notifications': 'Notifikasi',
+    'notification settings': 'Pengaturan Notifikasi',
+    'personal message options': 'Opsi Pesan Pribadi',
+    'ignore user options': 'Opsi Abaikan User',
+    'ignore boards preferences': 'Preferensi Abaikan Board',
+    'ignore boards options': 'Opsi Abaikan Board',
+    'authentication': 'Autentikasi',
+    'activate account': 'Aktifkan Akun',
+    'delete this account': 'Hapus Akun Ini',
+    'delete account': 'Hapus Akun',
+    'paid subscriptions': 'Langganan Berbayar'
+  };
+  // Translates one profile menu label (Indonesian only)
+  const menuLabel = (s) => {
+    if (LANG !== 'id') return s;
+    return MENU_ID[(s || '').trim().replace(/\s+/g, ' ').toLowerCase()] || s;
+  };
+
+  // Rewrites every text node under the given roots with a mapper function
+  function translateText(roots, fn) {
+    roots.forEach((root) => {
+      const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      const nodes = [];
+      let n;
+      while ((n = w.nextNode())) nodes.push(n);
+      nodes.forEach((tn) => {
+        if (!tn.nodeValue.trim()) return;
+        const out = fn(tn.nodeValue);
+        if (out !== tn.nodeValue) tn.nodeValue = out;
+      });
+    });
+  }
+
+  // Translates the original profile sidebar and the thread header (Author / Topic / Read N times)
+  function translateForumMenus() {
+    if (LANG !== 'id') return;
+    const side = [...document.querySelectorAll('#bodyarea .btx-pf-layout td.catbg, #bodyarea .btx-pf-layout a[href*="action=profile"]')];
+    translateText(side, (v) => {
+      const m = v.match(/^(\s*)([\s\S]*?)(\s*)$/);
+      return m[1] + menuLabel(m[2]) + m[3];
+    });
+    const sub = document.getElementById('top_subject');
+    const tbl = sub && sub.closest('table');
+    if (tbl) {
+      translateText([tbl], (v) => v
+        .replace(/^(\s*)Author(\s*)$/i, '$1Penulis$2')
+        .replace(/^(\s*)Topic:/i, '$1Topik:')
+        .replace(/\(Read\s+([\d.,]+)\s+times?\)/i, '(Dibaca $1 kali)'));
+    }
+  }
+
+  // Adds an "Upload to TalkImg" button above every reply box; the image code comes back through the popup's "insert" button
+  function setupTalkImg() {
+    const areas = [...document.querySelectorAll('#bodyarea textarea[name="message"]')];
+    if (!areas.length) return;
+    const id = LANG === 'id';
+    const T = {
+      btn: id ? 'Upload ke TalkImg' : 'Upload to TalkImg',
+      ok: id ? 'Gambar dimasukkan' : 'Image inserted',
+      blocked: id ? 'Popup diblokir browser, izinkan popup lalu coba lagi' : 'Popup blocked, allow popups and try again'
+    };
+    let target = areas[0];
+    let popup = null;
+    let msgEl = null;
+
+    // Finds the image code inside whatever the popup sent
+    const pick = (d) => {
+      if (typeof d === 'string') return d;
+      if (d && typeof d === 'object') {
+        for (const k of ['message', 'text', 'value', 'content', 'code', 'data']) {
+          if (typeof d[k] === 'string') return d[k];
+          if (d[k] && typeof d[k] === 'object') { const r = pick(d[k]); if (r) return r; }
+        }
+        for (const k in d) {
+          if (typeof d[k] === 'string' && /\[img|https?:\/\//i.test(d[k])) return d[k];
+        }
+      }
+      return '';
+    };
+
+    // Puts text at the cursor of the reply box
+    const insertText = (ta, text) => {
+      const v = ta.value;
+      const s = typeof ta.selectionStart === 'number' ? ta.selectionStart : v.length;
+      const e = typeof ta.selectionEnd === 'number' ? ta.selectionEnd : v.length;
+      ta.value = v.slice(0, s) + text + '\n' + v.slice(e);
+      const p = s + text.length + 1;
+      try { ta.selectionStart = ta.selectionEnd = p; } catch (x) {}
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      ta.focus();
+    };
+
+    const say = (t, ok) => {
+      if (!msgEl) return;
+      msgEl.textContent = t;
+      msgEl.className = 'btx-tki-msg' + (ok ? ' ok' : '');
+      clearTimeout(say._t);
+      say._t = setTimeout(() => { msgEl.textContent = ''; }, 3500);
+    };
+
+    window.addEventListener('message', (ev) => {
+      if (!/^https:\/\/(www\.)?talkimg\.com$/i.test(ev.origin)) return;
+      const text = pick(ev.data);
+      if (!text) { if (window.console) console.log('[btx] TalkImg message not understood:', ev.data); return; }
+      insertText(target, text.trim());
+      say(T.ok, true);
+      try { if (popup && !popup.closed) popup.close(); } catch (x) {}
+    });
+
+    areas.forEach((ta) => {
+      if (ta.dataset.btxTki) return;
+      ta.dataset.btxTki = '1';
+      const msg = h('span', { class: 'btx-tki-msg' });
+      const bar = h('div', { class: 'btx-tki' },
+        h('button', { type: 'button', onclick: () => {
+          target = ta;
+          msgEl = msg;
+          popup = window.open('https://talkimg.com/', 'talkimg', 'width=560,height=760,resizable=yes,scrollbars=yes');
+          if (!popup) say(T.blocked, false);
+          else popup.focus();
+        } }, T.btn),
+        msg);
+      const tbSel = (ta.form || document).querySelector('select[onchange*="color="]');
+      const place = () => {
+        if (!tbSel || !tbSel.parentNode) { ta.parentNode.insertBefore(bar, ta); return; }
+        if (window.matchMedia && window.matchMedia('(max-width:759px)').matches) tbSel.insertAdjacentElement('afterend', bar);
+        else tbSel.parentNode.appendChild(bar);
+      };
+      place();
+      if (window.matchMedia) {
+        const mqPlace = window.matchMedia('(max-width:759px)');
+        if (mqPlace.addEventListener) mqPlace.addEventListener('change', place);
+      }
+    });
   }
 
   // Builds the page footer
@@ -2414,9 +4493,18 @@ body.btx-legacy #bodyarea .btx-pgbar td.maintab_back a {
       safe(upgradePagers);
       safe(joinThreadHead);
       safe(restylePosts);
+      safe(setupMerits);
+      safe(setupProfile);
+      safe(() => document.querySelectorAll('#bodyarea .trustscore').forEach((el) => { if (!el.closest('.btx-pi')) paintTrust(el); }));
+      safe(setupShowPosts);
+      safe(setupStatPanel);
       safe(isolateSignatures);
       safe(setupGlows);
       safe(setupDividers);
+      safe(setupCodeCopy);
+      safe(translateLegacyUi);
+	  safe(translateForumMenus);
+      safe(setupTalkImg);
     }
 
     applyPrefs();
