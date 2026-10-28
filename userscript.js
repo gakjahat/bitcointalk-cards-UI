@@ -24,6 +24,7 @@
 
 
   // TalkImg page: make the "insert" and "copy" buttons bold and styled like the forum buttons
+  // TalkImg page: make the "insert" and "copy" buttons bold and styled like the forum buttons
   if (/(^|\.)talkimg\.com$/i.test(location.hostname)) {
     const tkiCss = '' +
       '.switch-combo{display:flex !important;flex-wrap:wrap !important;justify-content:flex-end !important;' +
@@ -40,10 +41,105 @@
       '.switch-combo .input-action[data-action="openerPostMessage"]{order:1}' +
       '.switch-combo .input-action[data-action="copy"]{order:2}' +
       '.switch-combo .input-action:hover{' +
-      'background:#2563eb !important;color:#ffffff !important;border-color:transparent !important}';
+      'background:#2563eb !important;color:#ffffff !important;border-color:transparent !important}' +
+      '.btx-tkisize{position:sticky;top:0;z-index:2147483000;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;' +
+      'box-sizing:border-box;width:100%;padding:8px 12px;background:#ffffff;color:#1e293b;' +
+      'border-bottom:1px solid rgba(37,99,235,.35);font:600 12px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}' +
+      '.btx-tkisize label{display:inline-flex;align-items:center;gap:6px}' +
+      '.btx-tkisize input{width:76px;height:28px;box-sizing:border-box;padding:0 8px;border-radius:8px;text-align:center;' +
+      'border:1px solid rgba(37,99,235,.45);background:#ffffff;color:#1e293b;font:inherit;font-size:13px;outline:0}' +
+      '.btx-tkisize input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.18)}' +
+      '.btx-tkisize .hint{font-weight:500;color:#64748b;font-size:11.5px}' +
+      '@media (prefers-color-scheme:dark){' +
+      '.btx-tkisize{background:#1b1d28;color:#e8e9f4;border-bottom-color:rgba(143,180,217,.4)}' +
+      '.btx-tkisize input{background:#242736;color:#e8e9f4;border-color:rgba(143,180,217,.45)}' +
+      '.btx-tkisize .hint{color:#979ab6}}';
     const tkiStyle = document.createElement('style');
     tkiStyle.textContent = tkiCss;
     (document.head || document.documentElement).appendChild(tkiStyle);
+
+    const tkiIsId = /^id\b/i.test(navigator.language || '');
+    const tkiText = {
+      width: tkiIsId ? 'Lebar' : 'Width',
+      height: tkiIsId ? 'Tinggi' : 'Height',
+      placeholder: 'auto',
+      hint: tkiIsId ? 'Kosong = ukuran asli' : 'Empty = original size'
+    };
+    const tkiSize = { width: '', height: '' };
+    const tkiTagRe = /\[img(?:\s[^\]]*)?\]/gi;
+
+    // Builds the attribute text for the img tag from the width and height values
+    function tkiAttrs() {
+      let out = '';
+      if (tkiSize.width) out += ' width=' + tkiSize.width;
+      if (tkiSize.height) out += ' height=' + tkiSize.height;
+      return out;
+    }
+
+    // Rewrites the img tags of one code box using the current width and height
+    function tkiApply(ta) {
+      let orig;
+      if (ta.dataset.btxApplied !== undefined && ta.value === ta.dataset.btxApplied) {
+        orig = ta.dataset.btxOrig;
+      } else {
+        orig = ta.value;
+        ta.dataset.btxOrig = orig;
+      }
+      if (!/\[img/i.test(orig)) return;
+      const attrs = tkiAttrs();
+      const next = attrs ? orig.replace(tkiTagRe, '[img' + attrs + ']') : orig;
+      ta.dataset.btxApplied = next;
+      if (ta.value !== next) ta.value = next;
+    }
+
+    // Applies the current size to every code box on the page
+    function tkiApplyAll() {
+      document.querySelectorAll('.switch-combo textarea').forEach(tkiApply);
+    }
+
+    // Builds one number field for the width or height
+    function tkiField(key) {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.inputMode = 'numeric';
+      input.placeholder = tkiText.placeholder;
+      input.setAttribute('aria-label', tkiText[key]);
+      input.addEventListener('input', () => {
+        let v = input.value.replace(/\D/g, '').slice(0, 4);
+        if (parseInt(v, 10) === 0) v = '';
+        if (input.value !== v) input.value = v;
+        tkiSize[key] = v;
+        tkiApplyAll();
+      });
+      const label = document.createElement('label');
+      label.append(document.createTextNode(tkiText[key]), input);
+      return label;
+    }
+
+    // Builds the size bar and places it at the top of the page
+    function tkiBuildBar() {
+      if (!document.body || document.querySelector('.btx-tkisize')) return;
+      const bar = document.createElement('div');
+      bar.className = 'btx-tkisize';
+      const hint = document.createElement('span');
+      hint.className = 'hint';
+      hint.textContent = tkiText.hint;
+      bar.append(tkiField('width'), tkiField('height'), hint);
+      document.body.insertBefore(bar, document.body.firstChild);
+    }
+
+    // Starts the size feature once the page is ready
+    function tkiStart() {
+      tkiBuildBar();
+      document.addEventListener('click', (e) => {
+        const btn = e.target && e.target.closest ? e.target.closest('.switch-combo .input-action') : null;
+        if (btn) tkiApplyAll();
+      }, true);
+      setInterval(tkiApplyAll, 700);
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tkiStart);
+    else tkiStart();
     return;
   }
 
@@ -3692,22 +3788,24 @@ body.btx-legacy #bodyarea .btx-tki{align-items:center}
     return items.length ? { items, pager } : null;
   }
 
-  // Builds the right-hand profile menu shared by Show Posts, Topics Started and Stats pages.
-  // The page that is currently open is hidden, every other page is listed.
+  // Builds the right-hand profile menu shared by Show Posts, Topics Started and Stats pages. Links come from the profile sidebar when it exists, otherwise they are built from the user id in the address. The open page is hidden and the settings card only appears when the sidebar exists.
   function profileSideCards(menu, cur) {
     const side = h('aside', { class: 'btx-pp-side' });
-    if (!menu) return side;
-    const find = (re) => menu.items.find((i) => re.test(i.href));
+    const items = menu ? menu.items : [];
+    const find = (re) => items.find((i) => re.test(i.href));
+    const um = location.search.match(/[;?&]u=(\d+)/);
+    const root = location.origin + '/index.php?action=profile' + (um ? ';u=' + um[1] : '');
+
     const sum = find(/sa=summary/);
     const posts = find(/sa=showPosts/);
     const stat = find(/sa=statPanel/);
-    const base = posts ? posts.href.replace(/;threads\b/, '') : '';
+    const base = posts ? posts.href.replace(/;threads\b/, '') : root + ';sa=showPosts';
 
     const all = [
-      { key: 'summary', label: LANG === 'id' ? 'Ringkasan' : 'Summary', href: sum ? sum.href : '' },
+      { key: 'summary', label: LANG === 'id' ? 'Ringkasan' : 'Summary', href: sum ? sum.href : root + ';sa=summary' },
       { key: 'posts', label: L('pfLastPosts'), href: base },
-      { key: 'threads', label: L('pfTopics'), href: base ? base + ';threads' : '' },
-      { key: 'stats', label: L('pfStats'), href: stat ? stat.href : '' }
+      { key: 'threads', label: L('pfTopics'), href: base + ';threads' },
+      { key: 'stats', label: L('pfStats'), href: stat ? stat.href : root + ';sa=statPanel' }
     ].filter((x) => x.href && x.key !== cur);
 
     const linkRow = (label, href) => h('a', { class: 'btx-pf-link', href },
@@ -3718,7 +3816,7 @@ body.btx-legacy #bodyarea .btx-tki{align-items:center}
         h('h2', { class: 'btx-pf-h' }, L('pfLinksTitle')),
         all.map((x) => linkRow(x.label, x.href))));
     }
-    const edit = menu.items.filter((i) => i.group === 'edit');
+    const edit = items.filter((i) => i.group === 'edit');
     if (edit.length) {
       side.append(h('section', { class: 'btx-pf-card' },
         h('h2', { class: 'btx-pf-h' }, L('pfSettings')),
