@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         Bitcointalk Cards Theme (Mobile Friendly)
+// @name         Bitcointalk Modern UI (Mobile Friendly)
 // @namespace    https://bitcointalk.org/
 // @match        https://talkimg.com/*
 // @match        https://www.talkimg.com/*
-// @version      1.5.9.5
+// @version      1.5.9.6
 // @description  Modern, mobile-friendly Bitcointalk UI: index, boards, neat thread posts (uncropped avatars, compact poster card on mobile), a light/dark skin for every other page, and BitList archive search shown right on the page. Language: auto / English / Indonesia.
 // @author       Gak Jahat
 // @match        https://bitcointalk.org/*
