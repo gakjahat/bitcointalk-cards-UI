@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         Bitcointalk Modern UI (Mobile Friendly)
+// @name         Bitcointalk Cards Theme (Mobile Friendly)
 // @namespace    https://bitcointalk.org/
 // @match        https://talkimg.com/*
 // @match        https://www.talkimg.com/*
-// @version      1.5.8
+// @version      1.5.9.5
 // @description  Modern, mobile-friendly Bitcointalk UI: index, boards, neat thread posts (uncropped avatars, compact poster card on mobile), a light/dark skin for every other page, and BitList archive search shown right on the page. Language: auto / English / Indonesia.
 // @author       Gak Jahat
 // @match        https://bitcointalk.org/*
@@ -13,6 +13,7 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_xmlhttpRequest
 // @connect      bitlist.co
+// @connect      lp.gatauwis.workers.dev
 // @connect      update.greasyfork.org
 // @license      Public/Free
 // @downloadURL https://update.greasyfork.org/scripts/601150/Bitcointalk%20Modern%20UI%20%28Mobile%20Friendly%29.user.js
@@ -22,6 +23,15 @@
 (function () {
   'use strict';
 
+  // Anti-flash: pasang cover secepat mungkin sebelum kode lain jalan
+  try {
+    if (/(^|\.)bitcointalk\.org$/i.test(location.hostname)) {
+      var pre = document.createElement('style');
+      pre.id = 'btx-boot-style';
+      pre.textContent = 'html{visibility:hidden !important;background:#E5E5E8 !important}';
+      (document.head || document.documentElement).appendChild(pre);
+    }
+  } catch (e) {}
 
   // TalkImg page: make the "insert" and "copy" buttons bold and styled like the forum buttons
   if (/(^|\.)talkimg\.com$/i.test(location.hostname)) {
@@ -40,10 +50,91 @@
       '.switch-combo .input-action[data-action="openerPostMessage"]{order:1}' +
       '.switch-combo .input-action[data-action="copy"]{order:2}' +
       '.switch-combo .input-action:hover{' +
-      'background:#2563eb !important;color:#ffffff !important;border-color:transparent !important}';
+      'background:#2563eb !important;color:#ffffff !important;border-color:transparent !important}' +
+      '.btx-sz{order:0;width:76px !important;flex:none !important;height:auto !important;margin:0 !important;' +
+      'box-sizing:border-box;padding:5px 8px !important;border-radius:10px !important;text-align:center;' +
+      'font-size:12px !important;font-weight:700 !important;line-height:1.2 !important;' +
+      'border:1px solid rgba(37,99,235,.45) !important;-moz-appearance:textfield}' +
+      '.btx-sz::-webkit-outer-spin-button,.btx-sz::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}';
     const tkiStyle = document.createElement('style');
     tkiStyle.textContent = tkiCss;
     (document.head || document.documentElement).appendChild(tkiStyle);
+
+    // Kotak Width / Height di samping tombol insert, isi kode ikut berubah langsung
+    (function () {
+      const KW = 'btx_imgW', KH = 'btx_imgH';
+      const rd = (k) => { try { return parseInt(localStorage.getItem(k), 10) || 0; } catch (e) { return 0; } };
+      const wr = (k, v) => { try { localStorage.setItem(k, String(v)); } catch (e) {} };
+      const orig = new WeakMap();
+
+      // Pasang ukuran ke satu kotak kode; kode asli disimpan supaya bisa dikembalikan
+      const apply = (ta) => {
+        if (!ta || typeof ta.value !== 'string') return;
+        let rec = orig.get(ta);
+        if (!rec || ta.value !== rec.out) {
+          rec = { src: ta.value, out: ta.value };
+          orig.set(ta, rec);
+        }
+        if (!rec.src) return;
+        const w = rd(KW), hh = rd(KH);
+        let out = rec.src;
+        if (w || hh) {
+          out = rec.src.replace(/\[img(?:\s[^\]]*)?\]/gi, (m) => {
+            const rest = m.slice(4, -1).replace(/\s*(?:width|height)=\S+/gi, '');
+            return '[img' + rest + (w ? ' width=' + w : '') + (hh ? ' height=' + hh : '') + ']';
+          });
+        }
+        if (out !== ta.value) ta.value = out;
+        rec.out = out;
+      };
+      const applyAll = () => document.querySelectorAll('.switch-combo textarea').forEach(apply);
+
+      const mkInput = (key, label) => {
+        const el = document.createElement('input');
+        el.type = 'number';
+        el.className = 'btx-sz';
+        el.dataset.key = key;
+        el.min = '0';
+        el.max = '4000';
+        el.placeholder = label;
+        el.title = label + ' (px)';
+        el.setAttribute('inputmode', 'numeric');
+        el.value = rd(key) || '';
+        el.addEventListener('input', () => {
+          wr(key, parseInt(el.value, 10) || 0);
+          document.querySelectorAll('.btx-sz').forEach((o) => {
+            if (o !== el && o.dataset.key === key) o.value = el.value;
+          });
+          applyAll();
+        });
+        return el;
+      };
+
+      const mount = () => {
+        document.querySelectorAll('.switch-combo').forEach((box) => {
+          if (box.querySelector('.btx-sz')) return;
+          const first = box.querySelector('.input-action');
+          if (!first || !first.parentNode) return;
+          first.parentNode.insertBefore(mkInput(KW, 'Width'), first);
+          first.parentNode.insertBefore(mkInput(KH, 'Height'), first);
+        });
+      };
+
+      // jaga-jaga: sebelum insert / copy dijalankan, pastikan ukuran sudah terpasang
+      document.addEventListener('click', (e) => {
+        if (e.target.closest && e.target.closest('.switch-combo .input-action')) applyAll();
+      }, true);
+
+      const start = () => {
+        mount();
+        applyAll();
+        new MutationObserver(mount).observe(document.body, { childList: true, subtree: true });
+        // kode baru muncul setelah upload selesai, jadi dicek berkala
+        setInterval(applyAll, 400);
+      };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+      else start();
+    })();
     return;
   }
 
@@ -123,7 +214,11 @@
       fontTitle: 'Font', fontTarget: 'Apply font to', fxAll: 'All', fxUi: 'Menu & buttons', fxContent: 'Thread & Content', fxCard: 'Board cards',
               colors: 'Colors', textColor: 'Text color', customColor: 'Custom color', colorDefault: 'Theme default',
               copy: 'Copy', copied: 'Copied', copyFail: 'Failed',
-      actMap: {}, sortMap: {}
+      wsToggle: 'Writing shortcuts (Ctrl + letter in reply box)', wsTitle: 'Writing shortcuts', wsOn: 'ON', wsOff: 'OFF (enable in Settings)',
+      wsHint: 'Active only while typing in the reply box. Select text first, or press again to remove the tag.',
+      wsBold: 'Bold', wsItalic: 'Italic', wsUnder: 'Underline', wsStrike: 'Strikethrough', wsCenter: 'Center', wsLeft: 'Align left',
+      wsRight: 'Align right', wsLink: 'Link', wsImage: 'Image', wsQuote: 'Quote', wsCode: 'Code',
+        actMap: {}, sortMap: {}
     },
     id: {
       toggleMenu: 'Alihkan tampilan modern / asli', today: 'Hari ini,', hasNew: 'Ada posting baru',
@@ -160,10 +255,15 @@
       fontTitle: 'Font', fontTarget: 'Terapkan font ke', fxAll: 'Semua', fxUi: 'Menu & tombol', fxContent: 'Thread & Konten', fxCard: 'Kartu board',
       colors: 'Warna', textColor: 'Warna teks', customColor: 'Warna kustom', colorDefault: 'Bawaan tema',
       copy: 'Salin', copied: 'Tersalin', copyFail: 'Gagal',
-          actMap: { 'New Topic': 'Topik baru', 'Post new poll': 'Polling baru', 'Mark Read': 'Tandai dibaca', 'Notify': 'Notifikasi', 'Unnotify': 'Matikan notifikasi', 'Un-notify': 'Matikan notifikasi' },
+      wsToggle: 'Shortcut menulis (Ctrl + huruf di kotak balasan)', wsTitle: 'Shortcut menulis', wsOn: 'ON', wsOff: 'OFF (aktifkan di Pengaturan)',
+      wsHint: 'Aktif hanya saat mengetik di kotak balasan. Blok teks dulu, atau tekan lagi untuk melepas tag.',
+      wsBold: 'Tebal', wsItalic: 'Miring', wsUnder: 'Garis bawah', wsStrike: 'Coret', wsCenter: 'Rata tengah', wsLeft: 'Rata kiri',
+      wsRight: 'Rata kanan', wsLink: 'Tautan', wsImage: 'Gambar', wsQuote: 'Kutipan', wsCode: 'Kode',
+        actMap: { 'New Topic': 'Topik baru', 'Post new poll': 'Polling baru', 'Mark Read': 'Tandai dibaca', 'Notify': 'Notifikasi', 'Unnotify': 'Matikan notifikasi', 'Un-notify': 'Matikan notifikasi' },
       sortMap: { 'Subject': 'Judul', 'Started by': 'Pembuat', 'Replies': 'Balasan', 'Views': 'Dilihat', 'Last post': 'Terakhir' }
     }
   };
+
   const LANG_PREF = store.get('lang', 'auto');
   const LANG = LANG_PREF === 'auto'
     ? (/^id\b/i.test(navigator.language || '') ? 'id' : 'en')
@@ -180,7 +280,11 @@
       location.reload();
     });
   }
-  if (!store.get('enabled', true)) return;
+if (!store.get('enabled', true)) {
+  const p = document.getElementById('btx-boot-style');
+  if (p) p.remove();
+  return;
+}
 
   const UPD_META_URL = 'https://update.greasyfork.org/scripts/601150/Bitcointalk%20Modern%20UI%20%28Mobile%20Friendly%29.meta.js';
   const UPD_INSTALL_URL = 'https://update.greasyfork.org/scripts/601150/Bitcointalk%20Modern%20UI%20%28Mobile%20Friendly%29.user.js';
@@ -297,16 +401,34 @@
   updStart();
 
   const BOOT_ID = 'btx-boot-style';
+  let btxReady = false;
+  let btxGuard = null;
   safe(() => {
     const t = store.get('theme', 'auto');
     const acc = store.get('accent', 'bitcointalk');
     const dark = t === 'dark' || (t === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
     const bg = dark ? '#12131a' : (acc === 'white' ? '#f4f3fa' : '#E5E5E8');
-    const st = document.createElement('style');
-    st.id = BOOT_ID;
-    st.textContent = 'html.btx-boot{background:' + bg + ' !important}' +  'html.btx-boot body{opacity:0 !important}';
-    (document.head || document.documentElement).appendChild(st);
+
+    // pakai style awal dari langkah 1 kalau sudah ada, kalau belum buat baru
+    let st = document.getElementById(BOOT_ID);
+    if (!st) {
+      st = document.createElement('style');
+      st.id = BOOT_ID;
+      (document.head || document.documentElement).appendChild(st);
+    }
+    st.textContent = 'html.btx-boot{background:' + bg + ' !important;visibility:hidden !important}';
     document.documentElement.classList.add('btx-boot');
+
+    // jaga supaya class penutup tidak hilang sebelum UI modern siap
+    btxGuard = new MutationObserver(() => {
+      if (!btxReady && !document.documentElement.classList.contains('btx-boot')) {
+        document.documentElement.classList.add('btx-boot');
+      }
+      if (!btxReady && !document.getElementById(BOOT_ID)) {
+        (document.head || document.documentElement).appendChild(st);
+      }
+    });
+    btxGuard.observe(document.documentElement, { attributes: true, attributeFilter: ['class'], childList: true });
   });
   safe(() => {
     if (!document.querySelector('meta[name="viewport"]')) {
@@ -319,9 +441,19 @@
   // Removes the anti-flash cover so the page becomes visible
   function unboot() {
     safe(() => {
-      document.documentElement.classList.remove('btx-boot');
-      const s = document.getElementById(BOOT_ID);
-      if (s && s.parentNode) s.parentNode.removeChild(s);
+      btxReady = true;
+      if (btxGuard) { btxGuard.disconnect(); btxGuard = null; }
+      let done = false;
+      const reveal = () => {
+        if (done) return;
+        done = true;
+        document.documentElement.classList.remove('btx-boot');
+        const s = document.getElementById(BOOT_ID);
+        if (s && s.parentNode) s.parentNode.removeChild(s);
+      };
+      // tunggu 2 frame supaya CSS modern sudah ter-paint, lalu buka
+      if (window.requestAnimationFrame) requestAnimationFrame(() => requestAnimationFrame(reveal));
+      setTimeout(reveal, 600);
     });
   }
   setTimeout(unboot, 6000);
@@ -612,6 +744,70 @@
       sorts,
       pager: parsePager(),
       topics: parseTopics()
+    };
+  }
+
+  // Parses the topic list pages that share one layout: unread, unread replies, recent (patrol) and watchlist
+  function parseUnreadPage() {
+    const body = document.getElementById('bodyarea');
+    const navEl = body.querySelector('div.nav');
+    const crumbs = navEl ? [...navEl.querySelectorAll('a.nav')].map((a) => ({ name: txt(a), href: a.href })) : [];
+    const topics = [];
+    body.querySelectorAll('tr').forEach((tr) => {
+      if (tr.children.length !== 7 || tr.querySelector('tr')) return;
+      const tds = tr.children;
+      const a = tds[2].querySelector('a[href*="topic="]');
+      if (!a || !tds[6].querySelector('.smalltext')) return;
+      const ic = (tds[0].querySelector('img') || {}).src || '';
+      const sub = tds[2];
+      const imgs = [...sub.querySelectorAll('img')].map((i) => i.src).join(' ');
+      const newA = sub.querySelector('a[href*="#new"]');
+      const small = sub.querySelector('span.smalltext');
+      const brd = small && small.querySelector('a[href*="board="]');
+      const st = tds[3].querySelector('a');
+      const lp = tds[6].querySelector('.smalltext');
+      const lpUser = lp && lp.querySelector('a[href*="action=profile"]');
+      const full = txt(lp);
+      const i = full.lastIndexOf(' by ');
+      const lastLink = tds[6].querySelector('a');
+      topics.push({
+        title: txt(a),
+        href: a.href,
+        sticky: /sticky/i.test(imgs),
+        locked: /lock/i.test(imgs),
+        poll: /poll/.test(ic),
+        heat: /veryhot/.test(ic) ? 2 : /hot/.test(ic) ? 1 : 0,
+        unread: !!newA,
+        newHref: newA ? newA.href : '',
+        pages: small ? [...small.querySelectorAll('a[href*="topic="]')].filter((p) => /^\d+$/.test(txt(p))).map((p) => ({ name: txt(p), href: p.href })) : [],
+        starter: txt(st),
+        starterHref: st ? st.href : '',
+        board: txt(brd),
+        boardHref: brd ? brd.href : '',
+        replies: txt(tds[4]),
+        views: txt(tds[5]),
+        time: idTime(i > -1 ? full.slice(0, i) : full),
+        lastUser: txt(lpUser),
+        lastHref: lastLink ? lastLink.href : a.href
+      });
+    });
+
+    const sorts = [...body.querySelectorAll('tr.titlebg a[href*="sort="]')].map((a) => {
+      const img = a.querySelector('img');
+      return { name: txt(a), href: a.href, active: !!img, dir: img && /sort_up/.test(img.src) ? 'up' : 'down' };
+    });
+    const actions = [];
+    const mk = body.querySelector('a[href*="action=markasread"]');
+    if (mk) actions.push({ name: txt(mk), href: mk.href, confirm: '' });
+    const all = body.querySelector('tr.titlebg td.middletext a[href*=";all"]');
+    if (all) actions.push({ name: txt(all), href: all.href, confirm: '' });
+    const pgTd = [...body.querySelectorAll('td.middletext')].find((t) => /^\s*Pages:/.test(t.textContent));
+
+    return {
+      title: crumbs.length ? crumbs[crumbs.length - 1].name : document.title,
+      crumbs, mods: '', children: [], actions, sorts,
+      pager: pgTd ? parsePager(pgTd) : null,
+      topics
     };
   }
 
@@ -2322,15 +2518,23 @@ body.btx-legacy #bodyarea .btx-tki{align-items:center}
     margin-top:8px !important;margin-bottom:4px !important;margin-left:0 !important}
 }
 
-/* ==== Thread bar bawah: tombol aksi di atas, nomor halaman di bawah ==== */
+/* ==== Thread bar bawah: aksi → nomor halaman → prev/next topic ==== */
 body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b > tbody > tr{
-  grid-template-areas:"nav acts" "pg pg" !important}
+  grid-template-columns:minmax(0,1fr) !important;
+  grid-template-areas:"acts" "pg" "nav" !important}
 body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
   margin-top:10px !important}
+body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b td.mirrortab_back,
+body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b td.maintab_back{
+  justify-content:flex-start !important;width:100% !important}
+body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b div.nav{
+  justify-content:space-between !important;width:100%}
+body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b div.nav a{
+  flex:1 1 0 !important;min-width:0}
 @media(max-width:759px){
   body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b > tbody > tr{
     grid-template-columns:minmax(0,1fr) !important;
-    grid-template-areas:"nav" "acts" "pg" !important}
+    grid-template-areas:"acts" "pg" "nav" !important}
 }
 
 /* ==== Tag Locked pada daftar topik ==== */
@@ -2339,6 +2543,1095 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
 :root[data-theme="dark"] .btx-tag.lock{color:#f87171 !important;
   background:color-mix(in srgb,#f87171 14%,var(--surface2));border-color:color-mix(in srgb,#f87171 35%,transparent)}
 .btx-topic.locked .btx-t-title{opacity:.85}
+
+/* ==== Mobile fix v13: pager tidak melebar, tombol aksi dan sort rapi di semua ponsel ==== */
+@media(max-width:759px){
+  .btx-pager.btx-pager2,
+  body.btx-legacy #bodyarea .btx-pager2,
+  body.btx-legacy #bodyarea .btx-pgbar .btx-pager2{
+    display:grid !important;grid-auto-flow:column !important;
+    grid-template-columns:minmax(0,1fr) !important;grid-auto-columns:max-content !important;
+    align-items:center;column-gap:6px !important;overflow:hidden !important}
+  .btx-pager2 > .btx-pgs.m{min-width:0 !important;width:100% !important;max-width:100% !important;overflow:hidden !important}
+  .btx-pager2 > .btx-jump{min-width:0 !important;justify-self:end}
+  .btx-pager2 > .btx-pgs.d{display:none !important}
+  .btx-acts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .btx-acts .btx-btn{justify-content:center;text-align:center;min-width:0;padding:9px 8px;font-size:13px}
+  .btx-acts .btx-btn:last-child:nth-child(odd){grid-column:1 / -1}
+  .btx-sorts .lbl{flex:1 1 100%;margin-right:0}
+  .btx-sorts .btx-sort{flex:1 1 auto;text-align:center}
+}
+
+/* ==== Seragam: sort, tag topik, dan tombol rounded tipis ==== */
+
+/* tombol sort: kotak rounded tipis, sama seperti nomor halaman */
+.btx-sort{
+  display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;
+  height:34px;padding:0 12px;border-radius:10px;font-size:13px;font-weight:600;line-height:1;
+  white-space:nowrap;background:var(--surface);border:1px solid var(--border);color:var(--muted) !important}
+.btx-sort.on{
+  background:color-mix(in srgb,var(--accent) 14%,var(--surface));
+  border-color:color-mix(in srgb,var(--accent) 45%,transparent);
+  color:var(--accent) !important;font-weight:700}
+
+/* semua tag topik (Sticky, Poll, New, Locked): kotak rounded tipis */
+.btx-tag{
+  display:inline-flex;align-items:center;box-sizing:border-box;
+  height:24px;padding:0 9px;border-radius:8px;font-size:11.5px;font-weight:600;line-height:1;
+  border:1px solid transparent}
+
+/* Sticky + Poll: background tipis seperti Locked, tapi warna aksen */
+.btx-tag:not(.new):not(.lock):not(.bad){
+  background:color-mix(in srgb,var(--accent) 14%,var(--surface2));
+  border-color:color-mix(in srgb,var(--accent) 35%,transparent);
+  color:var(--accent) !important}
+
+/* New: terisi penuh, bentuk tetap sama */
+.btx-tag.new{
+  background:var(--accent);border-color:transparent;color:var(--on-accent) !important}
+
+/* Locked: bentuk sama, tetap merah */
+.btx-tag.lock{border-radius:8px}
+
+/* nomor halaman kecil di bawah judul: samakan radius */
+.btx-tp a{border-radius:8px}
+
+/* ==== Mobile: baris sort tetap satu baris, ukuran ikut lebar layar ==== */
+@media(max-width:759px){
+  .btx-sorts{
+    display:flex !important;flex-wrap:nowrap !important;align-items:center;
+    gap:4px;overflow:hidden}
+  .btx-sorts .lbl{
+    flex:none !important;margin:0 2px 0 0 !important;
+    font-size:clamp(10px,2.9vw,13px);white-space:nowrap}
+  .btx-sorts .btx-sort{
+    flex:1 1 auto !important;min-width:0;
+    height:clamp(26px,7.6vw,32px);
+    padding:0 clamp(3px,1.4vw,8px);
+    font-size:clamp(9.5px,2.9vw,12.5px);
+    border-radius:9px;overflow:hidden;text-overflow:ellipsis}
+}
+/* layar sangat sempit: label "Sort by" disembunyikan supaya tombol tetap sebaris */
+@media(max-width:350px){
+  .btx-sorts .lbl{display:none}
+}
+
+/* ==== Thread bar bawah ==== */
+
+/* Desktop: sama seperti bar atas. Baris 1 = nomor halaman, baris 2 = prev/next (kiri) + tombol aksi (kanan) */
+@media(min-width:760px){
+  body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{margin-top:10px !important}
+  body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b > tbody > tr{
+    grid-template-columns:auto minmax(0,1fr) !important;
+    grid-template-areas:"nav acts" "pg pg" !important}
+  body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b div.nav{
+    justify-content:flex-start !important;width:auto !important}
+  body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b div.nav a{
+    flex:0 1 auto !important}
+  body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b td.mirrortab_back,
+  body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b td.maintab_back{
+    justify-content:flex-end !important;width:auto !important}
+}
+
+/* Mobile: aksi → nomor halaman → prev/next topic */
+@media(max-width:759px){
+  body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{margin-top:10px !important}
+  body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b > tbody > tr{
+    grid-template-columns:minmax(0,1fr) !important;
+    grid-template-areas:"acts" "pg" "nav" !important}
+  body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b td.mirrortab_back,
+  body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b td.maintab_back{
+    justify-content:flex-start !important;width:100% !important}
+  body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b div.nav{
+    justify-content:space-between !important;width:100%}
+  body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b div.nav a{
+    flex:1 1 0 !important;min-width:0}
+}
+
+/*================================================================================================================================================================*/
+
+/* ==== COMPACT VIEW (aktif hanya saat saklar Compact view menyala) ==== */
+
+/* --- umum: bar atas, hero, navigasi, kolom cari --- */
+body.btx.btx-compact .btx-top{padding-top:max(6px,env(safe-area-inset-top));padding-bottom:6px;gap:6px}
+body.btx.btx-compact .btx-top .btx-iconbtn{width:34px;height:34px;border-radius:10px}
+body.btx.btx-compact .btx-logo{width:28px;height:28px;font-size:16px;border-radius:9px}
+body.btx.btx-compact .btx-brand{font-size:15px}
+body.btx.btx-compact .btx-wrap{padding-top:8px;padding-bottom:24px}
+body.btx.btx-compact .btx-hero,
+body.btx.btx-compact .btx-hero.compact{padding:8px 12px;border-radius:14px}
+body.btx.btx-compact .btx-hero-top{gap:10px}
+body.btx.btx-compact .btx-hello{font-size:15px}
+body.btx.btx-compact .btx-sub{font-size:12px;margin-top:0}
+body.btx.btx-compact img.btx-avatar{max-height:52px;max-width:72px;border-radius:10px}
+body.btx.btx-compact div.btx-avatar{width:44px;height:44px;font-size:18px}
+body.btx.btx-compact .btx-quick{margin-top:8px !important;gap:5px !important}
+body.btx.btx-compact .btx-chip{height:26px !important;font-size:10.5px !important;border-radius:7px !important}
+body.btx.btx-compact .btx-news{margin-top:8px;padding:6px 10px;font-size:12px}
+body.btx.btx-compact .btx-nav{margin-top:8px;gap:5px}
+body.btx.btx-compact .btx-nav a{padding:5px 11px;font-size:13px;border-radius:10px}
+body.btx.btx-compact .btx-shellbar{margin-top:8px;gap:8px 12px}
+body.btx.btx-compact .btx-tools{gap:6px;margin-top:8px}
+body.btx.btx-compact .btx-field{height:38px;border-radius:11px}
+body.btx.btx-compact .btx-go{height:28px;padding:0 11px;font-size:13px}
+body.btx.btx-compact .btx-shellsearch .btx-field{height:36px}
+body.btx.btx-compact .btx-crumbs{margin-top:4px;padding-bottom:2px;font-size:12px}
+@media(max-width:759px){
+  body.btx.btx-compact .btx-nav{gap:5px}
+  body.btx.btx-compact .btx-nav a{height:32px;min-height:32px;padding:0 3px;font-size:12px;border-radius:8px}
+  body.btx.btx-compact .btx-tools-board .btx-field{height:38px}
+}
+
+/* --- index: kategori dan kartu board --- */
+body.btx.btx-compact .btx-cat{margin-top:12px}
+body.btx.btx-compact .btx-cat-h{padding:3px 4px}
+body.btx.btx-compact .btx-cat-h h2,
+body.btx.btx-compact .btx-sec-h{font-size:15px}
+body.btx.btx-compact .btx-sec-h{margin:14px 4px 4px}
+body.btx.btx-compact .btx-grid{gap:8px;margin-top:5px}
+body.btx.btx-compact .btx-board{padding:10px 12px;gap:6px;border-radius:14px}
+body.btx.btx-compact .btx-b-title{font-size:14.5px}
+body.btx.btx-compact .btx-stat{font-size:11px;padding:2px 8px}
+body.btx.btx-compact .btx-last{padding:6px 10px;border-radius:10px}
+body.btx.btx-compact .btx-last-t{font-size:12.5px}
+body.btx.btx-compact .btx-last-m{font-size:11px}
+body.btx.btx-compact .btx-kid{font-size:11.5px;padding:2px 8px}
+body.btx.btx-compact .btx-info{margin-top:14px;padding:10px 12px;border-radius:14px}
+body.btx.btx-compact .btx-info h2{margin-bottom:8px;font-size:15px}
+body.btx.btx-compact .btx-tiles{gap:6px;margin-bottom:8px}
+body.btx.btx-compact .btx-tile{padding:6px 8px}
+body.btx.btx-compact .btx-tile b{font-size:14px}
+body.btx.btx-compact .btx-recent a{padding:5px 6px}
+body.btx.btx-compact .btx-rt{font-size:13px}
+body.btx.btx-compact .btx-rm{font-size:11px}
+body.btx.btx-compact .btx-foot{margin-top:14px}
+
+/* --- board: judul, tombol aksi, sort, daftar topik --- */
+body.btx.btx-compact .btx-bhead{padding:8px 12px;border-radius:14px}
+body.btx.btx-compact .btx-bhead h1{font-size:18px}
+body.btx.btx-compact .btx-bmod{font-size:12px;margin-top:2px}
+body.btx.btx-compact .btx-listbar{margin:6px 0;gap:6px 12px}
+body.btx.btx-compact .btx-btn{padding:5px 12px;font-size:13px;border-radius:10px}
+body.btx.btx-compact .btx-sorts{margin:6px 0}
+body.btx.btx-compact .btx-sort{height:28px !important;padding:0 10px;font-size:12px;border-radius:8px}
+body.btx.btx-compact .btx-topics{border-radius:14px}
+body.btx.btx-compact .btx-topic{padding:8px 12px;gap:4px;border-left-width:3px}
+body.btx.btx-compact .btx-t-title{font-size:14px;line-height:1.3}
+body.btx.btx-compact .btx-tags{margin-top:3px;gap:4px}
+body.btx.btx-compact .btx-tag{height:20px;padding:0 7px;font-size:10.5px;border-radius:7px}
+body.btx.btx-compact .btx-t-by{margin-top:2px;font-size:11.5px}
+body.btx.btx-compact .btx-tp{margin-top:3px;gap:3px}
+body.btx.btx-compact .btx-tp a{font-size:10.5px;padding:0 6px}
+body.btx.btx-compact .btx-t-stats{font-size:11.5px}
+body.btx.btx-compact .btx-t-last{padding:4px 8px;font-size:11.5px;border-radius:8px}
+@media(min-width:760px){
+  body.btx.btx-compact .btx-topic{grid-template-columns:minmax(0,1fr) 120px 180px;gap:12px;padding:7px 14px}
+}
+@media(max-width:759px){
+  /* statistik di kiri, last post di kanan, sebaris */
+  body.btx.btx-compact .btx-topic{grid-template-columns:auto minmax(0,1fr);gap:4px 10px;align-items:center}
+  body.btx.btx-compact .btx-t-main{grid-column:1 / -1}
+  body.btx.btx-compact .btx-t-stats{gap:10px}
+}
+
+/* --- nomor halaman --- */
+body.btx.btx-compact .btx-pager{gap:4px;margin:3px 0}
+body.btx.btx-compact .btx-pager .pg,
+body.btx.btx-compact .btx-pager2 .pg,
+body.btx.btx-compact.btx-legacy #bodyarea .btx-pgbar .btx-pager2 .pg{height:28px !important;min-width:28px !important;font-size:12.5px !important;border-radius:8px !important}
+body.btx.btx-compact .btx-pager2 .btx-jump input{height:28px !important;font-size:13px !important;border-radius:8px !important}
+body.btx.btx-compact .btx-pager2 .btx-jump button{height:28px !important;font-size:12px !important;border-radius:8px !important}
+@media(max-width:759px){
+  body.btx.btx-compact .btx-pager2 .btx-pgs > .pg,
+  body.btx.btx-compact.btx-legacy #bodyarea .btx-pgbar .btx-pager2 .btx-pgs > .pg{height:28px !important;font-size:12px !important}
+  body.btx.btx-compact .btx-pager2 .btx-jump input,
+  body.btx.btx-compact.btx-legacy #bodyarea .btx-pgbar .btx-pager2 .btx-jump input{height:28px !important;font-size:16px !important}
+}
+
+/* --- halaman lain (legacy) dan thread --- */
+body.btx-compact.btx-legacy #bodyarea{padding-top:8px !important;padding-bottom:16px !important}
+body.btx-compact.btx-legacy #bodyarea td.msgcl1{padding-bottom:6px !important}
+body.btx-compact.btx-legacy #bodyarea td.msgcl1 > table > tbody > tr > td{border-radius:12px}
+body.btx-compact.btx-legacy #bodyarea table.btx-thead{border-radius:12px 12px 0 0 !important}
+body.btx-compact.btx-legacy #bodyarea table.btx-thead td{padding-top:5px;padding-bottom:5px}
+body.btx-compact.btx-legacy #bodyarea .btx-firstpost > table > tbody > tr > td{border-radius:0 0 12px 12px}
+body.btx-compact.btx-legacy #bodyarea td.td_headerandpost{padding-top:4px !important;padding-bottom:4px !important}
+body.btx-compact.btx-legacy #bodyarea .post{font-size:13.5px;line-height:1.45}
+body.btx-compact.btx-legacy #bodyarea .post hr{margin:6px 0}
+body.btx-compact.btx-legacy #bodyarea .smalltext,
+body.btx-compact.btx-legacy #bodyarea .middletext{font-size:11.5px}
+
+/* kartu poster */
+body.btx-compact.btx-legacy #bodyarea .btx-pi{gap:6px}
+body.btx-compact.btx-legacy #bodyarea .btx-pi-name{font-size:14px}
+body.btx-compact.btx-legacy #bodyarea .btx-pi-rank{font-size:11.5px}
+body.btx-compact.btx-legacy #bodyarea .btx-pi-stat{font-size:10.5px;padding:1px 7px}
+body.btx-compact.btx-legacy #bodyarea .btx-pi-extra{padding:5px 8px;font-size:10.5px}
+body.btx-compact.btx-legacy #bodyarea .btx-pi-acts{gap:6px}
+@media(min-width:760px){
+  body.btx-compact.btx-legacy #bodyarea .btx-pcell{width:170px !important;max-width:170px !important;padding:8px 8px !important}
+  body.btx-compact.btx-legacy #bodyarea .btx-pi-av img{max-height:120px;max-width:120px !important}
+  body.btx-compact.btx-legacy #bodyarea td.td_buttons > div > a{height:26px;min-width:26px;padding:0 8px;font-size:12px;border-radius:8px}
+}
+@media(max-width:759px){
+  body.btx-compact.btx-legacy #bodyarea .btx-pi{padding:4px 6px;column-gap:8px}
+  body.btx-compact.btx-legacy #bodyarea .btx-pi-av{width:56px;max-width:56px}
+  body.btx-compact.btx-legacy #bodyarea .btx-pi-av img{max-width:56px !important;max-height:72px}
+  body.btx-compact.btx-legacy #bodyarea .btx-pi-name{font-size:12.5px}
+  body.btx-compact.btx-legacy #bodyarea .btx-pi-rank{font-size:10.5px}
+  body.btx-compact.btx-legacy #bodyarea .btx-pi-stat{font-size:9.5px}
+}
+
+/* quote dan code */
+body.btx-compact.btx-legacy #bodyarea :is(.post,.btx-pp-body) .quoteheader,
+body.btx-compact.btx-legacy #bodyarea :is(.post,.btx-pp-body) .codeheader{margin-top:6px !important;padding:3px 10px !important;font-size:11px !important}
+body.btx-compact.btx-legacy #bodyarea :is(.post,.btx-pp-body) .quote,
+body.btx-compact.btx-legacy #bodyarea :is(.post,.btx-pp-body) .code{margin-bottom:6px !important;padding:5px 10px !important;font-size:12.5px !important}
+
+/* bar thread: tombol reply / prev / next dan nomor halaman */
+body.btx-compact.btx-legacy #bodyarea table.btx-pgbar > tbody > tr{row-gap:5px !important}
+body.btx-compact.btx-legacy #bodyarea table.btx-pgbar{margin-bottom:6px !important}
+body.btx-compact.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{margin-top:6px !important}
+body.btx-compact.btx-legacy #bodyarea table.btx-pgbar div.nav a,
+body.btx-compact.btx-legacy #bodyarea table.btx-pgbar td.mirrortab_back a,
+body.btx-compact.btx-legacy #bodyarea table.btx-pgbar td.maintab_back a{min-height:2em !important;padding:.2em 1em !important;font-size:12px !important;border-radius:8px !important}
+@media(max-width:759px){
+  body.btx-compact.btx-legacy #bodyarea table.btx-pgbar div.nav a,
+  body.btx-compact.btx-legacy #bodyarea table.btx-pgbar td.mirrortab_back a,
+  body.btx-compact.btx-legacy #bodyarea table.btx-pgbar td.maintab_back a{padding:.2em .5em !important;font-size:11px !important}
+}
+
+/* chip merit */
+body.btx-compact.btx-legacy #bodyarea .btx-mchip{padding:.2em .7em;font-size:11px}
+
+/* profil, Show Posts, Stats */
+body.btx-compact.btx-legacy #bodyarea .btx-pf,
+body.btx-compact.btx-legacy #bodyarea .btx-pf > div{gap:8px}
+body.btx-compact.btx-legacy #bodyarea .btx-pf-hero{padding:10px;gap:10px}
+body.btx-compact.btx-legacy #bodyarea .btx-pf-name{font-size:18px}
+body.btx-compact.btx-legacy #bodyarea .btx-pf-card{padding:2px 12px}
+body.btx-compact.btx-legacy #bodyarea .btx-pf-row{padding:7px 0;font-size:14px}
+body.btx-compact.btx-legacy #bodyarea .btx-pf-tile{padding:6px 10px}
+body.btx-compact.btx-legacy #bodyarea .btx-pf-tile .val{font-size:18px}
+body.btx-compact.btx-legacy #bodyarea .btx-pf-link{min-height:38px;padding:6px 0;font-size:14px}
+body.btx-compact.btx-legacy #bodyarea .btx-pp{gap:8px 14px}
+body.btx-compact.btx-legacy #bodyarea .btx-pp-list{gap:8px}
+body.btx-compact.btx-legacy #bodyarea .btx-pp-head{padding:6px 12px !important}
+body.btx-compact.btx-legacy #bodyarea .btx-pp-num{min-height:32px !important;font-size:13px !important}
+body.btx-compact.btx-legacy #bodyarea .btx-pp-t2{font-size:14.5px}
+body.btx-compact.btx-legacy #bodyarea .btx-pp-body{padding:4px 12px 10px}
+body.btx-compact.btx-legacy #bodyarea .btx-pp-acts{padding:6px 12px}
+
+/* ==== COMPACT: kartu board ringkas, tetap terbaca ==== */
+body.btx.btx-compact .btx-b-desc{display:none}
+body.btx.btx-compact .btx-b-main{min-width:0}
+body.btx.btx-compact .btx-b-mod{display:block;margin:2px 0 0;font-size:12px;white-space:normal;overflow:visible}
+body.btx.btx-compact .btx-last-t{display:none}
+body.btx.btx-compact .btx-last{padding:5px 10px;border-radius:10px}
+body.btx.btx-compact .btx-last-m{margin-top:0;font-size:12px;white-space:normal;overflow:visible}
+body.btx.btx-compact .btx-stats{flex-wrap:nowrap;gap:6px}
+body.btx.btx-compact .btx-stat{font-size:11.5px;padding:2px 9px;white-space:nowrap}
+
+/* HP: dua baris pendek */
+@media(max-width:759px){
+  body.btx.btx-compact .btx-board{
+    display:grid;grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:"main stats" "last last" "kids kids";
+    align-items:start;gap:6px 10px;padding:10px 12px}
+  body.btx.btx-compact .btx-b-main{grid-area:main}
+  body.btx.btx-compact .btx-stats{grid-area:stats;flex-direction:column;align-items:flex-end;gap:3px}
+  body.btx.btx-compact .btx-last{grid-area:last}
+  body.btx.btx-compact .btx-kids{grid-area:kids}
+}
+
+/* desktop/tablet: satu baris */
+@media(min-width:760px){
+  body.btx.btx-compact .btx-board{
+    flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:8px 14px}
+  body.btx.btx-compact .btx-b-main{flex:1 1 220px}
+  body.btx.btx-compact .btx-b-title{font-size:15px}
+  body.btx.btx-compact .btx-b-mod{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  body.btx.btx-compact .btx-stats{flex:none}
+  body.btx.btx-compact .btx-last{flex:0 1 260px;min-width:0}
+  body.btx.btx-compact .btx-kids{flex:1 1 100%}
+}
+
+/* ==== COMPACT: kartu board seragam v2 (judul / chip 3x2 / post kiri + topik kanan) ==== */
+body.btx.btx-compact .btx-last,
+body.btx.btx-compact .btx-b-desc,
+body.btx.btx-compact .btx-b-mod{display:none !important}
+
+body.btx.btx-compact .btx-grid{
+  display:grid !important;overflow:visible !important;
+  grid-template-columns:repeat(auto-fill,minmax(250px,1fr)) !important;
+  grid-auto-rows:1fr !important;gap:6px !important;margin-top:5px}
+
+/* kartu: 3 area tetap, rapat */
+body.btx.btx-compact .btx-board{
+  display:grid !important;flex:initial !important;min-width:0;
+  grid-template-columns:minmax(0,1fr) !important;
+  grid-template-rows:auto 47px auto !important;
+  grid-template-areas:"main" "kids" "stats" !important;
+  align-items:start !important;gap:4px !important;
+  padding:8px 10px !important;border-radius:12px !important}
+
+/* judul */
+body.btx.btx-compact .btx-b-main{grid-area:main !important;min-width:0}
+body.btx.btx-compact .btx-b-title{
+  display:block !important;margin:0 !important;font-size:14px !important;line-height:1.25 !important;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.btx.btx-compact .btx-b-title .btx-dot{display:inline-block;vertical-align:middle;margin:0 7px 0 0}
+
+/* chip child board: 3 kolom x 2 baris */
+body.btx.btx-compact .btx-kids{
+  grid-area:kids !important;display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  grid-auto-rows:22px !important;gap:3px !important;align-content:start !important;
+  height:47px !important;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+body.btx.btx-compact .btx-kids::-webkit-scrollbar{display:none}
+body.btx.btx-compact .btx-kid{
+  display:block !important;min-width:0;height:22px !important;line-height:20px !important;
+  padding:0 6px !important;box-sizing:border-box;font-size:11px !important;text-align:center;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.btx.btx-compact .btx-kid.new::before{display:inline-block;vertical-align:middle;margin:-2px 4px 0 0}
+
+/* post kiri bawah, topik kanan bawah */
+body.btx.btx-compact .btx-stats{
+  grid-area:stats !important;display:flex !important;flex-direction:row !important;
+  flex-wrap:nowrap !important;justify-content:space-between !important;align-items:center !important;
+  gap:6px !important;width:100%}
+body.btx.btx-compact .btx-stat{
+  padding:0 !important;background:none !important;font-size:11.5px !important;font-weight:600;
+  line-height:1.2;text-align:left;white-space:nowrap}
+body.btx.btx-compact .btx-stat:last-child{text-align:right}
+
+/* HP: 2 kartu per baris, chip 2 kolom */
+@media(max-width:759px){
+  body.btx.btx-compact .btx-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important}
+  body.btx.btx-compact .btx-board{padding:7px 9px !important;gap:3px !important}
+  body.btx.btx-compact .btx-b-title{font-size:13.5px !important}
+  body.btx.btx-compact .btx-kids{grid-template-columns:repeat(2,minmax(0,1fr)) !important}
+  body.btx.btx-compact .btx-stat{font-size:10.5px !important}
+}
+
+/* layar sangat sempit: 1 kartu per baris */
+@media(max-width:340px){
+  body.btx.btx-compact .btx-grid{grid-template-columns:minmax(0,1fr) !important}
+  body.btx.btx-compact .btx-kids{grid-template-columns:repeat(3,minmax(0,1fr)) !important}
+}
+
+/* ==== COMPACT: perbaikan desktop, chip child board tidak terpotong ==== */
+@media(min-width:760px){
+  body.btx.btx-compact .btx-grid{
+    grid-template-columns:repeat(auto-fill,minmax(300px,1fr)) !important}
+  body.btx.btx-compact .btx-kids{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important}
+  body.btx.btx-compact .btx-kid{
+    font-size:11.5px !important;padding:0 8px !important}
+}
+
+/* ==== DESKTOP: halaman lebih lebar + konten post tidak membuat halaman scroll samping ==== */
+@media(min-width:760px){
+  .btx-wrap{max-width:min(1600px,96vw) !important}
+  body.btx-legacy #bodyarea{max-width:min(1600px,96vw) !important;overflow-x:visible !important}
+  body.btx-legacy #bodyarea .btx-pf,
+  body.btx-legacy #bodyarea .btx-pp{max-width:min(1600px,96vw) !important}
+
+  /* konten yang terlalu lebar menggulir di dalam post */
+  body.btx-legacy #bodyarea .post{max-width:100%;overflow-x:auto}
+  body.btx-legacy #bodyarea .post :is(iframe,video,embed,object){max-width:100% !important}
+  body.btx-legacy #bodyarea .post table{max-width:100%}
+}
+
+/* ==== BOARD: susunan menu + pencarian per ukuran layar (tablet rapi) ==== */
+
+/* 760-899px: menu 4x2, pencarian diminimalkan seperti mobile */
+@media(min-width:760px) and (max-width:899px){
+  html body.btx .btx-boardbar{display:block !important}
+  html body.btx .btx-boardbar .btx-nav{display:grid !important;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px !important;width:100% !important}
+  html body.btx .btx-boardbar .btx-nav a{padding:0 4px !important;font-size:13px !important;white-space:nowrap}
+
+  html body.btx .btx-boardbar .btx-tools{
+    grid-auto-flow:row !important;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) !important;
+    grid-auto-columns:auto !important;gap:8px !important;margin:8px 0 0 !important}
+  html body.btx .btx-boardbar .btx-tools-board .btx-d-only{display:none !important}
+  html body.btx .btx-boardbar .btx-tools-board .btx-m-only{display:flex !important}
+  html body.btx .btx-boardbar .btx-tools-board .btx-field > .btx-ico{display:none}
+  html body.btx .btx-boardbar .btx-tools-board .btx-m-only .btx-go{display:none !important}
+  html body.btx .btx-boardbar .btx-tools-board .btx-sel{width:auto;max-width:none;font-size:14px;padding:0 4px}
+  html body.btx .btx-boardbar .btx-tools-board .btx-field input{padding-left:4px}
+}
+
+/* 900-1099px: menu satu baris, 3 pencarian di bawahnya tanpa ikon */
+@media(min-width:900px) and (max-width:1099px){
+  html body.btx .btx-boardbar .btx-nav a{padding:0 10px !important;font-size:13.5px !important;white-space:nowrap}
+  html body.btx .btx-boardbar .btx-field > .btx-ico{display:none}
+  html body.btx .btx-boardbar .btx-field{padding:0 5px 0 12px !important}
+  html body.btx .btx-boardbar .btx-go{padding:0 10px !important;font-size:12px !important}
+}
+
+/* 1100-1379px: tetap bertingkat (menu penuh di atas, 3 pencarian sama rata di bawahnya) */
+@media(min-width:1100px) and (max-width:1379px){
+  html body.btx .btx-boardbar{display:block !important}
+  html body.btx .btx-boardbar .btx-nav{width:100% !important;flex:none !important}
+  html body.btx .btx-boardbar .btx-nav a{flex:1 1 auto !important}
+  html body.btx .btx-boardbar .btx-tools{margin:8px 0 0 !important;flex:none !important;max-width:none !important}
+}
+
+/* 1380px ke atas: menu kiri, pencarian kanan sebaris */
+@media(min-width:1380px){
+  html body.btx .btx-boardbar{display:flex !important;align-items:center;justify-content:space-between;gap:10px 16px}
+  html body.btx .btx-boardbar .btx-nav{width:auto !important;flex:0 1 auto !important}
+  html body.btx .btx-boardbar .btx-nav a{flex:0 0 auto !important}
+  html body.btx .btx-boardbar .btx-tools{margin:0 0 0 auto !important;flex:1 1 640px !important;max-width:820px !important}
+}
+
+/* ==== COMPACT: child board tidak terpotong, tinggi kartu mengikuti isi ==== */
+body.btx.btx-compact .btx-board{
+  grid-template-rows:auto 1fr auto !important}
+
+body.btx.btx-compact .btx-kids{
+  display:flex !important;flex-wrap:wrap !important;align-content:flex-start !important;
+  gap:4px !important;height:auto !important;max-height:none !important;
+  overflow:visible !important}
+
+body.btx.btx-compact .btx-kid{
+  display:inline-flex !important;align-items:center !important;flex:0 1 auto !important;
+  height:auto !important;min-height:22px !important;max-width:100% !important;
+  padding:2px 9px !important;line-height:1.3 !important;text-align:left !important;
+  white-space:normal !important;overflow:visible !important;text-overflow:clip !important;
+  overflow-wrap:anywhere}
+
+body.btx.btx-compact .btx-kid.new::before{
+  flex:none;margin:0 5px 0 0}
+
+/* ==== Tombol Show child boards: teks mengikuti warna tombol aktif ==== */
+#btx-app .btx-cb-toggle{
+  color:var(--on-accent) !important;
+  font-family:inherit;font-size:13px;font-weight:700;line-height:1;
+  border:1px solid transparent}
+
+/* ==== Tombol aksi non-aktif (Post new poll, Mark Read, Notify): beri outline aksen ==== */
+#btx-app .btx-btn{
+  box-sizing:border-box;
+  color:var(--link) !important;
+  background:color-mix(in srgb,var(--accent) 10%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--accent) 55%,transparent);
+  font-weight:600;
+  transition:background .15s,color .15s,border-color .15s}
+#btx-app .btx-btn:hover{
+  background:color-mix(in srgb,var(--accent) 22%,var(--surface));
+  border-color:var(--accent)}
+#btx-app .btx-btn:active{transform:scale(.97)}
+
+/* tombol aktif (New Topic): tetap terisi penuh, ukuran sama dengan yang lain */
+#btx-app .btx-btn.primary{
+  background:var(--accent);
+  color:var(--on-accent) !important;
+  border-color:transparent;
+  font-weight:700}
+#btx-app .btx-btn.primary:hover{filter:brightness(1.1);background:var(--accent)}
+
+/* ==== COMPACT: kartu board = judul / child board / stats / last post ==== */
+body.btx.btx-compact .btx-board{
+  grid-template-columns:minmax(0,1fr) !important;
+  grid-template-rows:auto 1fr auto auto !important;
+  grid-template-areas:"main" "kids" "stats" "last" !important;
+  gap:5px !important}
+
+/* statistik: rata kiri, dipisah garis tegak */
+body.btx.btx-compact .btx-stats{
+  justify-content:flex-start !important;gap:0 !important}
+body.btx.btx-compact .btx-stat{
+  text-align:left !important;white-space:nowrap}
+body.btx.btx-compact .btx-stat:last-child{text-align:left !important}
+body.btx.btx-compact .btx-stat + .btx-stat::before{
+  content:"|";margin:0 8px;opacity:.5;font-weight:400}
+
+/* last post: tampil lagi, berupa teks link tanpa kotak */
+body.btx.btx-compact .btx-last{
+  display:block !important;grid-area:last !important;
+  padding:0 !important;background:none !important;border-radius:0 !important;min-width:0}
+body.btx.btx-compact .btx-last:hover{background:none !important}
+body.btx.btx-compact .btx-last-t{display:none !important}
+body.btx.btx-compact .btx-last-m{
+  display:block !important;margin:0 !important;font-size:11.5px !important;
+  white-space:nowrap !important;overflow:hidden !important;text-overflow:ellipsis !important}
+body.btx.btx-compact .btx-last-m::before{content:"Last post "}
+body.btx.btx-compact .btx-last:hover .btx-last-m b{text-decoration:underline}
+
+/* ==== INDEX: menu + pencarian sama seperti halaman board ==== */
+.btx-boardbar{zoom:var(--btx-fs-ui,1)}
+.btx-boardbar .btx-tools,.btx-boardbar .btx-nav{zoom:1}
+.btx-tools-board{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.btx-tools-board .btx-m-only{display:none}
+
+@media(min-width:761px){
+  .btx-boardbar{display:block;margin-top:14px}
+  body.btx .btx-boardbar .btx-nav{display:flex !important;flex-wrap:wrap;gap:8px;margin:0 !important;padding:0;width:100%}
+  body.btx .btx-boardbar .btx-nav a{flex:1 1 auto !important;display:flex !important;align-items:center;justify-content:center;
+    height:36px !important;min-height:0 !important;padding:0 14px !important;font-size:14px !important;border-radius:11px !important;box-sizing:border-box}
+  body.btx .btx-boardbar .btx-tools{display:grid !important;grid-auto-flow:column !important;
+    grid-template-columns:none !important;grid-auto-columns:minmax(0,1fr) !important;gap:8px !important;margin:8px 0 0 !important;max-width:none !important}
+  body.btx .btx-boardbar .btx-field{height:36px !important;border-radius:11px !important;padding:0 5px 0 12px !important;gap:6px}
+  body.btx .btx-boardbar .btx-field input{font-size:13.5px}
+  body.btx .btx-boardbar .btx-go{height:28px !important;padding:0 12px !important;font-size:12.5px !important;border-radius:8px !important}
+}
+@media(min-width:1100px){
+  .btx-boardbar{display:flex;align-items:center;justify-content:space-between;gap:10px 16px}
+  body.btx .btx-boardbar .btx-nav{width:auto;flex:0 1 auto}
+  body.btx .btx-boardbar .btx-nav a{flex:0 0 auto !important}
+  body.btx .btx-boardbar .btx-tools{margin:0 0 0 auto !important;flex:1 1 640px;max-width:820px}
+}
+@media(max-width:759px){
+  .btx-tools-board{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:8px}
+  .btx-tools-board .btx-d-only{display:none !important}
+  .btx-tools-board .btx-m-only{display:flex}
+  .btx-tools-board .btx-field{height:44px;padding:0 6px 0 6px;gap:4px}
+  .btx-tools-board .btx-field > .btx-ico{display:none}
+  .btx-tools-board .btx-m-only .btx-go{display:none}
+  .btx-tools-board .btx-sel{flex:none;width:auto;max-width:none;font-size:14px;padding:0 2px}
+  .btx-tools-board .btx-field input{padding-left:2px}
+}
+
+
+/* ==== Profil: tombol Message / Show posts lebih ramping, berukuran pas ==== */
+body.btx-legacy #bodyarea .btx-pf-acts{gap:8px}
+body.btx-legacy #bodyarea .btx-pf-acts a{
+  flex:0 1 auto;min-height:0;height:34px;padding:0 20px;box-sizing:border-box;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;line-height:1;border-radius:10px;
+  border:1px solid color-mix(in srgb,var(--accent) 45%,transparent)}
+body.btx-legacy #bodyarea .btx-pf-acts a:not(.primary){
+  color:var(--link) !important;
+  background:color-mix(in srgb,var(--accent) 10%,var(--surface))}
+body.btx-legacy #bodyarea .btx-pf-acts a.primary{border-color:transparent}
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pf-acts a{flex:1 1 0;padding:0 10px}
+}
+
+/* ==== Hover untuk semua menu dan tombol (hanya di perangkat yang punya mouse) ==== */
+.btx-nav a,.btx-chip,.btx-sort,.btx-iconbtn,.btx-pager .pg,
+.btx-board,.btx-topic,.btx-last,.btx-recent a,
+body.btx-legacy #bodyarea .btx-pf-link,
+body.btx-legacy #bodyarea .btx-pf-tile,
+body.btx-legacy #bodyarea .btx-pf-acts a{
+  transition:background .15s,color .15s,border-color .15s,box-shadow .15s,transform .15s}
+
+@media(hover:hover){
+  /* menu utama (Home, Help, Search, ...) */
+  .btx-nav a:not(.on):hover{
+    background:color-mix(in srgb,var(--accent) 14%,var(--surface));
+    border-color:color-mix(in srgb,var(--accent) 55%,transparent);
+    color:var(--accent) !important}
+  .btx-nav a.on:hover{filter:brightness(1.1)}
+
+  /* chip Unread / Replies / Patrol / Watchlist */
+  .btx-chip:hover{background:color-mix(in srgb,var(--accent) 24%,transparent);transform:translateY(-1px)}
+  .btx-chip.ghost:hover{background:color-mix(in srgb,var(--accent) 14%,var(--surface2));color:var(--accent) !important}
+
+  /* tombol sort dan nomor halaman */
+  .btx-sort:not(.on):hover{
+    background:color-mix(in srgb,var(--accent) 12%,var(--surface));
+    border-color:color-mix(in srgb,var(--accent) 45%,transparent);
+    color:var(--accent) !important}
+  .btx-pager a.pg:hover{
+    background:color-mix(in srgb,var(--accent) 14%,var(--surface));
+    border-color:color-mix(in srgb,var(--accent) 50%,transparent);
+    color:var(--accent) !important}
+
+  /* tombol ikon di bar atas */
+  .btx-iconbtn:hover{
+    background:color-mix(in srgb,var(--accent) 14%,var(--surface));
+    border-color:color-mix(in srgb,var(--accent) 55%,transparent);
+    color:var(--accent)}
+
+  /* kartu board dan baris topik */
+  .btx-board:hover{
+    border-color:color-mix(in srgb,var(--accent) 50%,var(--border));
+    box-shadow:0 2px 4px rgba(0,0,0,.06),0 10px 24px rgba(0,0,0,.10)}
+  .btx-topic:hover{background:color-mix(in srgb,var(--accent) 6%,var(--surface))}
+  .btx-topic.sticky:hover{background:color-mix(in srgb,var(--accent) 10%,var(--surface))}
+
+  /* profil: menu samping, kotak angka, tombol */
+  body.btx-legacy #bodyarea .btx-pf-link:hover{
+    background:color-mix(in srgb,var(--accent) 12%,transparent);
+    border-radius:10px;padding-left:10px;padding-right:10px;
+    color:var(--accent) !important;border-top-color:transparent}
+  body.btx-legacy #bodyarea .btx-pf-link:hover + .btx-pf-link{border-top-color:transparent}
+  body.btx-legacy #bodyarea .btx-pf-link:hover .btx-ico{color:var(--accent)}
+  body.btx-legacy #bodyarea a.btx-pf-tile:hover{
+    border-color:color-mix(in srgb,var(--accent) 55%,var(--border));
+    background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+  body.btx-legacy #bodyarea .btx-pf-acts a:not(.primary):hover{
+    background:var(--accent);color:var(--on-accent) !important;border-color:transparent}
+  body.btx-legacy #bodyarea .btx-pf-acts a.primary:hover{filter:brightness(1.1)}
+}
+
+/* ==== Menu samping profil: teks tidak pernah bergeser, latar hover digambar di belakang ==== */
+body.btx-legacy #bodyarea .btx-pf-link,
+body.btx-legacy #bodyarea .btx-pf-link:hover,
+body.btx-legacy #bodyarea .btx-pp-side .btx-pf-link.on{
+  padding:10px 0 !important;
+  margin:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  position:relative;isolation:isolate}
+
+body.btx-legacy #bodyarea .btx-pf-link::before{
+  content:"";position:absolute;z-index:-1;
+  top:3px;bottom:3px;left:-10px;right:-10px;
+  border-radius:10px;background:transparent;
+  transition:background .15s}
+
+body.btx-legacy #bodyarea .btx-pp-side .btx-pf-link.on::before{
+  background:color-mix(in srgb,var(--accent) 14%,transparent)}
+
+@media(hover:hover){
+  body.btx-legacy #bodyarea .btx-pf-link:hover::before{
+    background:color-mix(in srgb,var(--accent) 12%,transparent)}
+}
+
+/* ==== Kartu profil: avatar | info | tombol, terdistribusi rapi (tablet hingga laptop) ==== */
+@media(min-width:760px){
+  body.btx-legacy #bodyarea .btx-pf-hero{
+    display:grid;grid-template-columns:auto minmax(0,1fr) auto;
+    grid-template-areas:"av id acts";
+    column-gap:24px;align-items:stretch;padding:16px 20px}
+
+  /* kiri: avatar lebih besar, di dalam bingkai */
+  body.btx-legacy #bodyarea .btx-pf-av{
+    grid-area:av;align-self:center;max-width:170px;min-width:110px;padding:8px;
+    display:flex;align-items:center;justify-content:center;
+    border:1px solid var(--border);border-radius:14px;background:var(--surface2)}
+  body.btx-legacy #bodyarea .btx-pf-av img{max-height:150px;box-shadow:none}
+
+  /* tengah: username, rank, status, personal text, rata di tengah tinggi kartu */
+  body.btx-legacy #bodyarea .btx-pf-id{
+    grid-area:id;align-self:center;display:flex;flex-direction:column;min-width:0}
+  body.btx-legacy #bodyarea .btx-pf-name{font-size:26px}
+  body.btx-legacy #bodyarea .btx-pf-text{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+
+  /* kanan: tombol bertumpuk, dipisah garis tegak */
+  body.btx-legacy #bodyarea .btx-pf-acts{
+    grid-area:acts;flex:none;display:flex;flex-direction:column;justify-content:center;gap:10px;
+    min-width:170px;padding-left:24px;border-left:1px solid var(--border)}
+  body.btx-legacy #bodyarea .btx-pf-acts a{flex:none;width:100%;height:38px;font-size:13.5px}
+}
+
+/* ==== Mobile: tampilan tetap, avatar sedikit lebih besar ==== */
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pf-av{max-width:130px}
+  body.btx-legacy #bodyarea .btx-pf-av img{max-height:190px}
+}
+
+/* ==== Menu samping profil: judul dengan latar warna ==== */
+body.btx-legacy #bodyarea .btx-pf-card:not(.btx-pf-sig) > .btx-pf-h{
+  margin:-4px -14px 4px;padding:10px 14px;
+  background:color-mix(in srgb,var(--accent) 16%,var(--surface));
+  border-bottom:1px solid color-mix(in srgb,var(--accent) 32%,var(--border));
+  border-radius:calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px) 0 0;
+  color:var(--text);font-size:14px}
+body.btx-compact.btx-legacy #bodyarea .btx-pf-card:not(.btx-pf-sig) > .btx-pf-h{
+  margin:-2px -12px 4px;padding:8px 12px}
+
+/* ==== Lebar halaman satu sumber: bar atas selalu lurus dengan kartu ==== */
+:root{--btx-maxw:1180px}
+@media(min-width:760px){:root{--btx-maxw:min(1600px,96vw)}}
+
+.btx-top{
+  padding-left:calc((100% - var(--btx-maxw))/2 + 14px) !important;
+  padding-right:calc((100% - var(--btx-maxw))/2 + 14px) !important}
+.btx-wrap{max-width:var(--btx-maxw) !important}
+@media(min-width:760px){
+  body.btx-legacy #bodyarea{max-width:var(--btx-maxw) !important}
+  body.btx-legacy #bodyarea .btx-pf,
+  body.btx-legacy #bodyarea .btx-pp{max-width:var(--btx-maxw) !important}
+}
+
+/* ==== Nama brand: tagline hanya di layar lebar ==== */
+.btx-bname{white-space:nowrap}
+.btx-btag{font-weight:500;color:var(--muted)}
+@media(max-width:759px){
+  .btx-btag{display:none}
+}
+
+/* ==== Kotak lebar gambar di samping tombol Upload ke TalkImg ==== */
+body.btx-legacy #bodyarea .btx-tki-w{
+  width:78px;height:24px;box-sizing:border-box;padding:0 8px;margin:0;
+  border-radius:8px;font-size:12px;font-weight:600;text-align:center;
+  background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  -moz-appearance:textfield}
+body.btx-legacy #bodyarea .btx-tki-w::-webkit-outer-spin-button,
+body.btx-legacy #bodyarea .btx-tki-w::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-tki-w{height:26px;font-size:16px}
+}
+
+/* ==== Topic Summary (di bawah kotak balasan): bar, teks, dan tombol Insert Quote ==== */
+
+/* bar "Posted by / Posted on": warna aksen, teks terbaca */
+body.btx-legacy #bodyarea tr.catbg > td.smalltext[colspan="2"]{
+  background:var(--accent) !important;background-image:none !important;
+  color:var(--on-accent) !important;
+  padding:8px 14px !important;font-size:12.5px !important;font-weight:600 !important;line-height:1.4;
+  border-bottom:0 !important;overflow-wrap:anywhere}
+body.btx-legacy #bodyarea tr.catbg > td.smalltext[colspan="2"] div,
+body.btx-legacy #bodyarea tr.catbg > td.smalltext[colspan="2"] a{
+  color:var(--on-accent) !important;font-weight:600}
+body.btx-legacy #bodyarea tr.catbg > td.smalltext[colspan="2"] div{opacity:.85;font-weight:500}
+
+/* isi post: ukuran sama seperti post di thread */
+body.btx-legacy #bodyarea td.smalltext[id^="msg"]{
+  font-size:14px !important;line-height:1.55;padding:10px 16px 16px !important;
+  background:var(--surface) !important;color:var(--text)}
+body.btx-legacy #bodyarea td.smalltext[id^="msg"] .post{
+  font-size:14px;line-height:1.55;max-width:100%;overflow-x:auto}
+body.btx-compact.btx-legacy #bodyarea td.smalltext[id^="msg"] .post{font-size:13.5px;line-height:1.45}
+
+/* tombol Insert Quote: bentuk tombol, seragam dengan tombol lain */
+body.btx-legacy #bodyarea td.smalltext[id^="msg"] > div.smalltext{
+  display:flex;justify-content:flex-end;margin:0 0 8px;font-size:0 !important}
+body.btx-legacy #bodyarea td.smalltext[id^="msg"] > div.smalltext a{
+  display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;
+  height:26px;padding:0 12px;border-radius:8px;
+  font-size:12px;font-weight:700;line-height:1;text-decoration:none;
+  color:var(--link) !important;
+  background:color-mix(in srgb,var(--accent) 10%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);
+  transition:background .15s,color .15s,border-color .15s}
+@media(hover:hover){
+  body.btx-legacy #bodyarea td.smalltext[id^="msg"] > div.smalltext a:hover{
+    background:var(--accent);color:var(--on-accent) !important;border-color:transparent}
+}
+
+/* mobile: bar tidak terlalu rapat */
+@media(max-width:759px){
+  body.btx-legacy #bodyarea tr.catbg > td.smalltext[colspan="2"]{padding:7px 12px !important;font-size:12px !important}
+  body.btx-legacy #bodyarea td.smalltext[id^="msg"]{padding:8px 12px 14px !important}
+}
+
+/* ==== Form balasan: ikon toolbar, smiley, dan kotak ketik lebih besar ==== */
+
+/* ikon toolbar (Bold, Italic, Quote, Code, dst.) */
+body.btx-legacy #bodyarea #postmodify img[src*="/bbc/"]:not([src*="divider"]){
+  width:30px !important;height:30px !important;box-sizing:border-box;
+  padding:3px;margin:2px 3px 2px 0 !important;border-radius:8px;
+  background-color:var(--surface2) !important;background-image:none !important;
+  border:1px solid var(--border);object-fit:contain;
+  transition:background-color .15s,border-color .15s}
+body.btx-legacy #bodyarea #postmodify img[src*="/bbc/divider"]{height:24px;margin:0 6px !important;vertical-align:middle}
+@media(hover:hover){
+  body.btx-legacy #bodyarea #postmodify img[src*="/bbc/"]:not([src*="divider"]):hover{
+    background-color:color-mix(in srgb,var(--accent) 18%,var(--surface)) !important;
+    border-color:color-mix(in srgb,var(--accent) 55%,transparent)}
+}
+/* mode gelap: ikon asli berwarna gelap, diberi latar terang supaya terlihat */
+:root[data-theme="dark"] body.btx-legacy #bodyarea #postmodify img[src*="/bbc/"]:not([src*="divider"]){
+  background-color:#eceef5 !important;border-color:transparent}
+
+/* tombol Change Color dan Upload ke TalkImg: ikut tinggi ikon baru */
+body.btx-legacy #bodyarea select[onchange*="color="],
+body.btx-legacy #bodyarea .btx-tki button{
+  height:30px !important;font-size:12.5px !important;border-radius:9px !important}
+
+/* kotak ketik dan kolom judul */
+body.btx-legacy #bodyarea #postmodify textarea[name="message"]{
+  font-size:calc(17px * var(--btx-fs-ct,1)) !important;line-height:1.6 !important;
+  min-height:280px;padding:12px 14px}
+body.btx-legacy #bodyarea #postmodify input[name="subject"]{
+  font-size:calc(15px * var(--btx-fs-ct,1)) !important;padding:9px 12px}
+body.btx-compact.btx-legacy #bodyarea #postmodify textarea[name="message"]{
+  font-size:calc(14px * var(--btx-fs-ct,1)) !important;min-height:220px}
+
+/* mobile: minimal 16px supaya browser tidak memperbesar layar saat mengetik */
+@media(max-width:759px){
+  body.btx-legacy #bodyarea #postmodify textarea[name="message"],
+  body.btx-legacy #bodyarea #postmodify input[name="subject"]{font-size:max(16px,calc(17px * var(--btx-fs-ct,1))) !important}
+  body.btx-legacy #bodyarea #postmodify img[src*="/bbc/"]:not([src*="divider"]){
+    width:32px !important;height:32px !important;margin:2px 2px 2px 0 !important}
+  body.btx-legacy #bodyarea #postmodify img[src*="/Smileys/"]{width:28px !important;height:28px !important}
+  body.btx-legacy #bodyarea select[onchange*="color="],
+  body.btx-legacy #bodyarea .btx-tki button{height:32px !important}
+}
+
+/* ==== COMPACT: isi post lebih ringkas ==== */
+body.btx-compact.btx-legacy #bodyarea .post .btx-br-x{display:none}
+body.btx-compact.btx-legacy #bodyarea .post{line-height:1.4}
+body.btx-compact.btx-legacy #bodyarea .post hr{margin:4px 0}
+body.btx-compact.btx-legacy #bodyarea .post .quote > br:first-child{display:none}
+body.btx-compact.btx-legacy #bodyarea .post img.userimg{margin:2px 0}
+body.btx-compact.btx-legacy #bodyarea .td_headerandpost hr{margin:2px 0 !important}
+
+/* ==== Index dan board: teks lebih besar (tidak berlaku di Compact view) ==== */
+body.btx:not(.btx-compact) .btx-cat-h h2,
+body.btx:not(.btx-compact) .btx-sec-h{font-size:19px}
+body.btx:not(.btx-compact) .btx-cat-h .count{font-size:14px}
+body.btx:not(.btx-compact) .btx-b-title{font-size:18px}
+body.btx:not(.btx-compact) .btx-b-desc{font-size:15px}
+body.btx:not(.btx-compact) .btx-b-mod{font-size:13px}
+body.btx:not(.btx-compact) .btx-stat{font-size:13.5px;padding:4px 12px}
+body.btx:not(.btx-compact) .btx-last-t{font-size:15px}
+body.btx:not(.btx-compact) .btx-last-m{font-size:13px}
+body.btx:not(.btx-compact) .btx-kid{font-size:14px;padding:5px 12px}
+body.btx:not(.btx-compact) .btx-t-title{font-size:17px}
+body.btx:not(.btx-compact) .btx-t-by,
+body.btx:not(.btx-compact) .btx-t-stats,
+body.btx:not(.btx-compact) .btx-t-last{font-size:13.5px}
+body.btx:not(.btx-compact) .btx-tag{font-size:12.5px;height:26px}
+body.btx:not(.btx-compact) .btx-info h2{font-size:19px}
+body.btx:not(.btx-compact) .btx-rt{font-size:15.5px}
+body.btx:not(.btx-compact) .btx-rm{font-size:13px}
+body.btx:not(.btx-compact) .btx-nav a{font-size:15px}
+body.btx:not(.btx-compact) .btx-field input{font-size:15px}
+
+/* ==== Pager HP v14: tidak pernah melewati kartu, bisa digeser kalau tidak muat ==== */
+@media(max-width:759px){
+  :is(html body, html body.btx-legacy #bodyarea) .btx-pager.btx-pager2{
+    max-width:100% !important;min-width:0 !important;overflow:hidden !important;box-sizing:border-box !important}
+  :is(html body, html body.btx-legacy #bodyarea) .btx-pager2 > .btx-pgs.m{
+    min-width:0 !important;max-width:100% !important;
+    overflow-x:auto !important;overflow-y:hidden !important;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  :is(html body, html body.btx-legacy #bodyarea) .btx-pager2 > .btx-pgs.m::-webkit-scrollbar{display:none}
+  :is(html body, html body.btx-legacy #bodyarea) .btx-pager2 .btx-pgs.m > .pg.pg{
+    flex:1 0 auto !important;min-width:30px !important;padding:0 8px !important;
+    white-space:nowrap !important;overflow:visible !important}
+  :is(html body, html body.btx-legacy #bodyarea) .btx-pager2 .btx-pgs.m > .gap{flex:0 0 auto !important;display:inline-block !important}
+  :is(html body, html body.btx-legacy #bodyarea) .btx-pager2 > .btx-jump input{width:60px !important}
+  html body.btx-legacy #bodyarea td.btx-pgcell{min-width:0 !important;max-width:100% !important;overflow:hidden}
+}
+
+
+
+/* ==== PESAN PRIBADI (PM) ==== */
+body.btx-legacy #bodyarea .btx-pm .btx-pp-main{gap:12px}
+body.btx-legacy #bodyarea .btx-pm-form{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;min-width:0;margin:0}
+body.btx-legacy #bodyarea .btx-pm-form > br,
+body.btx-legacy #bodyarea .btx-pm-form > script{display:none}
+body.btx-legacy #bodyarea .btx-pm-card{
+  width:100% !important;max-width:100% !important;box-sizing:border-box;
+  border:1px solid var(--border) !important;border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow)}
+body.btx-legacy #bodyarea .personalmessage{overflow-wrap:anywhere;max-width:100%}
+
+/* bar halaman + label + hapus */
+body.btx-legacy #bodyarea .btx-pm-bar{
+  background:var(--surface) !important;border:1px solid var(--border) !important;
+  border-radius:var(--r-md);padding:0 !important;box-shadow:var(--shadow);overflow:visible}
+body.btx-legacy #bodyarea .btx-pm-bar > table,
+body.btx-legacy #bodyarea .btx-pm-bar > table > tbody,
+body.btx-legacy #bodyarea .btx-pm-bar > table > tbody > tr{
+  display:block;width:100% !important;background:transparent !important}
+body.btx-legacy #bodyarea .btx-pm-bar > table > tbody > tr > td{
+  display:flex !important;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;
+  padding:8px 10px !important;background:transparent !important;color:var(--text) !important;border:0 !important}
+body.btx-legacy #bodyarea .btx-pm-bar td > div{float:none !important;display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}
+body.btx-legacy #bodyarea .btx-pm-bar td > div:first-child{flex:1 1 100%}
+body.btx-legacy #bodyarea .btx-pm-bar td > div:last-child{margin-left:auto}
+body.btx-legacy #bodyarea .btx-pm-bar select{max-width:100%}
+body.btx-legacy #bodyarea .btx-pm-bar input[type="submit"]{height:30px;padding:0 14px;border-radius:9px;font-size:12.5px}
+
+/* pilih semua + kartu pesan */
+body.btx-legacy #bodyarea .btx-pm-selall{display:flex;align-items:center;gap:8px;padding:0 4px;font-size:13px;color:var(--muted);cursor:pointer}
+body.btx-legacy #bodyarea .btx-pm-selall input,
+body.btx-legacy #bodyarea .btx-pm-sel input{width:18px;height:18px;margin:0;padding:0}
+body.btx-legacy #bodyarea .btx-pm-sel{display:inline-flex;align-items:center;gap:6px;margin-right:auto;font-size:12px;color:var(--muted);cursor:pointer}
+body.btx-legacy #bodyarea .btx-pm-sig{min-width:0;padding:8px 16px 12px;border-top:1px dashed var(--border)}
+body.btx-legacy #bodyarea .btx-pm .btx-pp-crumbs{gap:4px 6px}
+
+/* tabel form (kirim, cari, label, prune) */
+body.btx-legacy #bodyarea .btx-pm .btx-pp-main > :is(form,div) > p{padding:0 4px;color:var(--muted);font-size:12.5px}
+
+/* sidebar: di bawah 900px jadi baris chip di atas konten */
+@media(max-width:899px){
+  body.btx-legacy #bodyarea .btx-pm.btx-pp{grid-template-areas:"top" "side" "main"}
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-side{position:static;display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-side .btx-pf-card{
+    display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 10px !important}
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-side .btx-pf-card > .btx-pf-h{
+    flex:none;margin:0 4px 0 0 !important;padding:0 !important;background:none !important;
+    border:0 !important;border-radius:0 !important;font-size:12px}
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-side .btx-pf-link{
+    flex:none;display:inline-flex;align-items:center;min-height:0 !important;height:30px;
+    padding:0 12px !important;border-radius:9px !important;font-size:12.5px;font-weight:700;
+    color:var(--accent) !important;
+    background:color-mix(in srgb,var(--accent) 10%,var(--surface)) !important;
+    border:1px solid color-mix(in srgb,var(--accent) 35%,transparent) !important}
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-side .btx-pf-link::before{display:none}
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-side .btx-pf-link .btx-ico{display:none}
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-side .btx-pf-link .t{flex:none}
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-side .btx-pf-link.on{
+    background:var(--accent) !important;color:var(--on-accent) !important;border-color:transparent !important}
+}
+
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pm-sig{padding:6px 12px 10px}
+
+  /* cari pesan */
+  body.btx-legacy #bodyarea .btx-pm form[name="pmSearchForm"] table,
+  body.btx-legacy #bodyarea .btx-pm form[name="pmSearchForm"] tbody,
+  body.btx-legacy #bodyarea .btx-pm form[name="pmSearchForm"] tr,
+  body.btx-legacy #bodyarea .btx-pm form[name="pmSearchForm"] td{
+    display:block;width:100% !important;max-width:100%;box-sizing:border-box}
+  body.btx-legacy #bodyarea .btx-pm form[name="pmSearchForm"] td{padding:4px 2px !important}
+  body.btx-legacy #bodyarea .btx-pm form[name="pmSearchForm"] td:empty{display:none}
+  body.btx-legacy #bodyarea .btx-pm form[name="pmSearchForm"] input[type="text"],
+  body.btx-legacy #bodyarea .btx-pm form[name="pmSearchForm"] select{width:100% !important;font-size:16px}
+  body.btx-legacy #bodyarea .btx-pm form[name="pmSearchForm"] input[name="minage"],
+  body.btx-legacy #bodyarea .btx-pm form[name="pmSearchForm"] input[name="maxage"]{width:72px !important;display:inline-block;text-align:center}
+  body.btx-legacy #bodyarea .btx-pm form[name="pmSearchForm"] input.check{width:auto !important}
+
+  /* kelola label + prune */
+  body.btx-legacy #bodyarea .btx-pm form[action*="sa=manlabels"] input[type="text"],
+  body.btx-legacy #bodyarea .btx-pm form[action*="sa=prune"] input[type="text"]{font-size:16px}
+  body.btx-legacy #bodyarea .btx-pm form[action*="sa=manlabels"] input[type="text"]{width:100% !important}
+  body.btx-legacy #bodyarea .btx-pm form[action*="sa=manlabels"] tr.windowbg2{display:flex;align-items:center;gap:8px;padding:4px 8px}
+  body.btx-legacy #bodyarea .btx-pm form[action*="sa=manlabels"] tr.windowbg2 > td{display:block;flex:none;width:auto !important;padding:0 !important;text-align:left !important}
+  body.btx-legacy #bodyarea .btx-pm form[action*="sa=manlabels"] tr.windowbg2 > td:has(input[type="text"]){flex:1 1 0;min-width:0}
+  body.btx-legacy #bodyarea .btx-pm form[action*="sa=prune"] input[name="age"]{width:56px !important;text-align:center}
+}
+
+
+/* ==== PM: perbaikan bar halaman + kotak Select ==== */
+
+/* bar halaman/hapus: tinggi mengikuti isi, tidak terkunci 25px lagi */
+body.btx-legacy #bodyarea .btx-pm-bar,
+body.btx-legacy #bodyarea .btx-pm-bar > table,
+body.btx-legacy #bodyarea .btx-pm-bar > table > tbody > tr,
+body.btx-legacy #bodyarea .btx-pm-bar > table > tbody > tr > td{
+  height:auto !important;min-height:0 !important}
+body.btx-legacy #bodyarea .btx-pm-bar{
+  padding:2px !important;border-color:color-mix(in srgb,var(--accent) 40%,var(--border)) !important}
+body.btx-legacy #bodyarea .btx-pm-bar > table > tbody > tr > td{
+  padding:8px 10px !important;align-items:center}
+body.btx-legacy #bodyarea .btx-pm-bar .btx-pager2{margin:0 !important;width:100% !important;max-width:100% !important}
+body.btx-legacy #bodyarea .btx-pm-bar td > div:first-child{min-width:0}
+
+/* tombol Delete Selected: tetap di dalam kartu, rata kanan */
+body.btx-legacy #bodyarea .btx-pm-bar td > div:last-child{margin-left:auto;flex:none}
+body.btx-legacy #bodyarea .btx-pm-bar input[name="del_selected"]{
+  height:32px;padding:0 16px;border-radius:9px;font-size:12.5px;font-weight:700;
+  background:var(--accent);color:var(--on-accent);border:0;cursor:pointer}
+
+/* "Select" di tiap kartu + "Pilih semua": jelas terlihat, ada bingkai aksen */
+body.btx-legacy #bodyarea .btx-pm-sel,
+body.btx-legacy #bodyarea .btx-pm-selall{
+  display:inline-flex;align-items:center;gap:8px;box-sizing:border-box;
+  height:30px;padding:0 12px 0 9px;border-radius:9px;
+  font-size:12.5px;font-weight:700;line-height:1;cursor:pointer;
+  color:var(--text) !important;
+  background:color-mix(in srgb,var(--accent) 8%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--accent) 55%,transparent);
+  transition:background .15s,border-color .15s}
+body.btx-legacy #bodyarea .btx-pm-selall{height:34px;justify-self:start;margin:0 0 2px}
+body.btx-legacy #bodyarea .btx-pm-sel{margin-right:auto}
+body.btx-legacy #bodyarea .btx-pm-sel input,
+body.btx-legacy #bodyarea .btx-pm-selall input{
+  width:18px;height:18px;margin:0;padding:0;flex:none;cursor:pointer;
+  accent-color:var(--accent)}
+@media(hover:hover){
+  body.btx-legacy #bodyarea .btx-pm-sel:hover,
+  body.btx-legacy #bodyarea .btx-pm-selall:hover{
+    background:color-mix(in srgb,var(--accent) 18%,var(--surface));border-color:var(--accent)}
+}
+/* kalau dicentang: kotak ikut terisi warna aksen */
+body.btx-legacy #bodyarea .btx-pm-sel:has(input:checked),
+body.btx-legacy #bodyarea .btx-pm-selall:has(input:checked){
+  background:color-mix(in srgb,var(--accent) 20%,var(--surface));border-color:var(--accent)}
+
+/* baris tombol aksi kartu: Select di kiri, tombol lain di kanan */
+body.btx-legacy #bodyarea .btx-pm .btx-pp-acts{align-items:center}
+body.btx-legacy #bodyarea .btx-pm .btx-pp-acts a{height:30px}
+
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pm-bar td > div:last-child{margin-left:0;flex:1 1 100%}
+  body.btx-legacy #bodyarea .btx-pm-bar input[name="del_selected"]{width:100%}
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-acts{gap:6px}
+  body.btx-legacy #bodyarea .btx-pm-sel{flex:1 1 100%;margin-right:0}
+}
+
+
+/* ==== PM: turunkan garis pemisah di atas tombol aksi ==== */
+body.btx-legacy #bodyarea .btx-pm .btx-pp-body{padding-bottom:26px}
+body.btx-legacy #bodyarea .btx-pm .btx-pm-sig{padding-bottom:22px}
+body.btx-legacy #bodyarea .btx-pm .btx-pp-acts{padding-top:12px}
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-body{padding-bottom:22px}
+  body.btx-legacy #bodyarea .btx-pm .btx-pm-sig{padding-bottom:18px}
+}
+
+
+/* ==== PM: buang garis biru di bawah bar halaman ==== */
+body.btx-legacy #bodyarea .btx-pm-bar,
+body.btx-legacy #bodyarea .btx-pm-bar > table,
+body.btx-legacy #bodyarea .btx-pm-bar > table > tbody > tr,
+body.btx-legacy #bodyarea .btx-pm-bar > table > tbody > tr > td,
+body.btx-legacy #bodyarea .btx-pm-bar .catbg,
+body.btx-legacy #bodyarea .btx-pm-bar tr.catbg > td{
+  border-bottom:0 !important;box-shadow:none;background-image:none !important}
+body.btx-legacy #bodyarea .btx-pm-bar{
+  overflow:hidden;border-bottom:1px solid color-mix(in srgb,var(--accent) 40%,var(--border)) !important}
+
+/* ==== PM: menu samping jadi dropdown MENU di layar kecil ==== */
+body.btx-legacy #bodyarea .btx-pm-menubtn{display:none}
+body.btx-legacy #bodyarea .btx-pm-menupanel{display:contents}
+
+@media(max-width:899px){
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-side{display:block;position:static}
+
+  body.btx-legacy #bodyarea .btx-pm-menubtn{
+    display:flex;align-items:center;gap:10px;width:100%;height:44px;padding:0 14px;box-sizing:border-box;
+    border-radius:var(--r-md);cursor:pointer;text-align:left;
+    color:var(--text);font:inherit;font-size:14px;font-weight:700;
+    background:var(--surface);border:1px solid color-mix(in srgb,var(--accent) 45%,var(--border));
+    box-shadow:var(--shadow)}
+  body.btx-legacy #bodyarea .btx-pm-menubtn .m{
+    flex:none;padding:3px 10px;border-radius:8px;font-size:12px;letter-spacing:.06em;
+    background:var(--accent);color:var(--on-accent)}
+  body.btx-legacy #bodyarea .btx-pm-menubtn .c{flex:1;min-width:0;color:var(--muted);font-weight:600;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  body.btx-legacy #bodyarea .btx-pm-menubtn .btx-ico{flex:none;margin-left:auto;color:var(--muted);transition:transform .2s}
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-side.open .btx-pm-menubtn .btx-ico{transform:rotate(180deg)}
+
+  body.btx-legacy #bodyarea .btx-pm-menupanel{display:none}
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-side.open .btx-pm-menupanel{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin-top:8px}
+
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-side .btx-pf-card{display:block;padding:4px 10px 6px !important}
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-side .btx-pf-card > .btx-pf-h{
+    display:block;margin:0 !important;padding:8px 2px 4px !important;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--muted);background:none !important;border:0 !important;border-radius:0 !important}
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-side .btx-pf-link{
+    display:flex;align-items:center;width:100%;height:40px;min-height:0 !important;margin:2px 0 !important;
+    padding:0 12px !important;box-sizing:border-box;border-radius:10px !important;
+    font-size:14px;font-weight:600;color:var(--text) !important;
+    background:transparent !important;border:0 !important}
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-side .btx-pf-link .t{flex:1;min-width:0}
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-side .btx-pf-link.on{
+    background:var(--accent) !important;color:var(--on-accent) !important}
+}
+@media(max-width:899px) and (hover:hover){
+  body.btx-legacy #bodyarea .btx-pm .btx-pp-side .btx-pf-link:not(.on):hover{
+    background:color-mix(in srgb,var(--accent) 12%,transparent) !important;color:var(--accent) !important}
+}
+
+/* ==== Halaman Members: kartu "tidak dipublikasikan lagi" ==== */
+body.btx-legacy #bodyarea .btx-gone{
+  display:grid;justify-items:center;gap:10px;text-align:center;box-sizing:border-box;
+  width:100%;max-width:520px;margin:40px auto;padding:32px 20px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow)}
+body.btx-legacy #bodyarea .btx-gone-code{
+  font-size:64px;font-weight:800;line-height:1;letter-spacing:-.03em;color:var(--accent)}
+body.btx-legacy #bodyarea .btx-gone-t{
+  margin:0;font-size:20px;font-weight:700;line-height:1.3;letter-spacing:-.01em;color:var(--text);overflow-wrap:anywhere}
+body.btx-legacy #bodyarea .btx-gone-d{
+  margin:0;font-size:14px;color:var(--muted)}
+body.btx-legacy #bodyarea .btx-gone .btx-btn{
+  margin-top:8px;text-decoration:none}
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-gone{margin:24px auto;padding:26px 16px}
+  body.btx-legacy #bodyarea .btx-gone-code{font-size:52px}
+  body.btx-legacy #bodyarea .btx-gone-t{font-size:18px}
+}
 
 `;
 
@@ -2356,6 +3649,7 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
     accC: store.get('accC', 'default'),
     txtC: store.get('txtC', 'default'),
     bitlist: store.get('bitlist', true),
+     wshort: store.get('wshort', true),
     blinline: store.get('blinline', true),
     fsUi: store.get('fsUi', store.get('fsize', 100)),
     fsPost: store.get('fsPost', store.get('fsize', 100)),
@@ -2477,6 +3771,7 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
   const FONT_GOOGLE_URL = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=Source+Serif+4:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Patrick+Hand&family=Fredoka:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap';
   const FONT_LINK_ID = 'btx-fonts';
 
+  // Loads the web fonts stylesheet once
   function ensureFonts() {
     if (document.getElementById(FONT_LINK_ID)) return;
     const link = document.createElement('link');
@@ -2509,6 +3804,7 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
     const tb = document.getElementById('btx-theme-btn');
     if (tb) { tb.innerHTML = ''; tb.append(icon(resolvedTheme() === 'dark' ? 'sun' : 'moon')); }
     if ([prefs.ffUi, prefs.ffPost, prefs.ffCard].some(f => FONT_STACKS[f])) ensureFonts();
+          safe(compactPosts);
   }
 
   // Updates one preference, saves it and re-applies all preferences
@@ -2709,7 +4005,7 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
   // Builds the sticky top bar with brand and tool buttons
   function makeTopbar(sheet) {
     return h('header', { class: 'btx-top' },
-      h('a', { class: 'btx-brand', href: '/index.php' }, h('span', { class: 'btx-logo' }, '\u20BF'), 'Bitcoin Forum'),
+      h('a', { class: 'btx-brand', href: '/index.php' }, h('span', { class: 'btx-logo' }, '\u20BF'), h('span', { class: 'btx-bname' }, 'BitcoinTalk', h('span', { class: 'btx-btag' }, ' | Bitcoin Forum'))),
       h('button', { class: 'btx-iconbtn', 'aria-label': L('language'), title: L('language'), onclick: sheet.openLang }, icon('lang')),
       h('button', { class: 'btx-iconbtn', 'aria-label': L('fontTitle'), title: L('fontTitle'), onclick: sheet.openFont }, icon('font')),
       h('button', { class: 'btx-iconbtn', 'aria-label': L('accent'), title: L('accent'), onclick: sheet.openColor }, icon('palette')),
@@ -3641,13 +4937,30 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
     ].filter(Boolean);
   }
 
+  // Builds the Show Posts base address of the viewed member (works for own and other profiles)
+  function profileBase(menu, d) {
+    const fromMenu = menu && menu.items.find((i) => /sa=showPosts/.test(i.href));
+    if (fromMenu) return fromMenu.href.replace(/;threads\b/, '');
+    if (d && d.postsHref) return d.postsHref.replace(/;threads\b/, '');
+    const m = location.search.match(/[?&;]u=(\d+)/);
+    return m ? location.origin + '/index.php?action=profile;u=' + m[1] + ';sa=showPosts' : '';
+  }
+
   // Builds the activity links card and the settings card
   function profileBottom(d, menu) {
     const labelFor = (l) => (/sa=statPanel/.test(l.href) ? L('pfStats') : (/threads/.test(l.href) ? L('pfTopics') : (/sa=showPosts/.test(l.href) ? L('pfLastPosts') : l.name)));
     const linkRow = (label, href) => h('a', { class: 'btx-pf-link', href }, h('span', { class: 't' }, label), icon('next'));
     const out = [];
-    if (d.links.length) {
-      out.push(h('section', { class: 'btx-pf-card' }, h('h2', { class: 'btx-pf-h' }, L('pfLinksTitle')), d.links.map((l) => linkRow(labelFor(l), l.href))));
+    const rows = d.links
+      .filter((l) => !/action=pm\b/.test(l.href))
+      .map((l) => ({ label: labelFor(l), href: l.href }));
+    const base = profileBase(menu, d);
+    if (base && !d.links.some((l) => /threads/.test(l.href))) {
+      const i = rows.findIndex((r) => r.label === L('pfLastPosts'));
+      rows.splice(i > -1 ? i + 1 : rows.length, 0, { label: L('pfTopics'), href: base + ';threads' });
+    }
+    if (rows.length) {
+      out.push(h('section', { class: 'btx-pf-card' }, h('h2', { class: 'btx-pf-h' }, L('pfLinksTitle')), rows.map((r) => linkRow(r.label, r.href))));
     }
     const edit = menu ? menu.items.filter((i) => i.group === 'edit') : [];
     if (edit.length) {
@@ -3734,22 +5047,21 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
     return items.length ? { items, pager } : null;
   }
 
-  // Builds the right-hand profile menu shared by Show Posts, Topics Started and Stats pages.
-  // The page that is currently open is hidden, every other page is listed.
   function profileSideCards(menu, cur) {
     const side = h('aside', { class: 'btx-pp-side' });
-    if (!menu) return side;
-    const find = (re) => menu.items.find((i) => re.test(i.href));
+    const items = menu ? menu.items : [];
+    const find = (re) => items.find((i) => re.test(i.href));
+    const uid = (location.search.match(/[?&;]u=(\d+)/) || [])[1];
+    const root = uid ? location.origin + '/index.php?action=profile;u=' + uid : '';
     const sum = find(/sa=summary/);
-    const posts = find(/sa=showPosts/);
     const stat = find(/sa=statPanel/);
-    const base = posts ? posts.href.replace(/;threads\b/, '') : '';
+    const base = profileBase(menu, null);
 
     const all = [
-      { key: 'summary', label: LANG === 'id' ? 'Ringkasan' : 'Summary', href: sum ? sum.href : '' },
+      { key: 'summary', label: LANG === 'id' ? 'Ringkasan' : 'Summary', href: sum ? sum.href : (root ? root + ';sa=summary' : '') },
       { key: 'posts', label: L('pfLastPosts'), href: base },
       { key: 'threads', label: L('pfTopics'), href: base ? base + ';threads' : '' },
-      { key: 'stats', label: L('pfStats'), href: stat ? stat.href : '' }
+      { key: 'stats', label: L('pfStats'), href: stat ? stat.href : (root ? root + ';sa=statPanel' : '') }
     ].filter((x) => x.href && x.key !== cur);
 
     const linkRow = (label, href) => h('a', { class: 'btx-pf-link', href },
@@ -3760,7 +5072,7 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
         h('h2', { class: 'btx-pf-h' }, L('pfLinksTitle')),
         all.map((x) => linkRow(x.label, x.href))));
     }
-    const edit = menu.items.filter((i) => i.group === 'edit');
+    const edit = items.filter((i) => i.group === 'edit');
     if (edit.length) {
       side.append(h('section', { class: 'btx-pf-card' },
         h('h2', { class: 'btx-pf-h' }, L('pfSettings')),
@@ -4141,6 +5453,853 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
     });
   }
 
+  // Compact view: kecilkan teks yang terlalu besar dan satukan baris kosong berulang di dalam post
+  function compactPosts() {
+    if (!document.body) return;
+    const on = document.body.classList.contains('btx-compact');
+    const CAP = 16; // ukuran maksimal teks (px) saat Compact view
+    document.querySelectorAll('#bodyarea .post').forEach((post) => {
+      // tandai baris kosong ganda (hanya sekali); disembunyikan lewat CSS saat compact
+      if (!post.dataset.btxBr) {
+        post.dataset.btxBr = '1';
+        post.querySelectorAll('br').forEach((br) => {
+          if (br.closest('pre, code, .code')) return;
+          let p = br.previousSibling;
+          while (p && p.nodeType === 3 && !p.nodeValue.trim()) p = p.previousSibling;
+          if (p && p.nodeType === 1 && p.tagName === 'BR') br.classList.add('btx-br-x');
+        });
+      }
+      // teks terlalu besar: kecilkan saat compact, kembalikan saat compact mati
+      post.querySelectorAll('[style*="font-size"], font[size]').forEach((el) => {
+        if (el.closest('pre, code, .code, .btx-glowbox')) return;
+        if (on) {
+          if (el.dataset.btxClamped) return;
+          const px = parseFloat(getComputedStyle(el).fontSize) || 0;
+          if (px <= CAP) return;
+          el.dataset.btxFs = el.style.getPropertyValue('font-size') + '|' + el.style.getPropertyPriority('font-size');
+          el.dataset.btxLh = el.style.getPropertyValue('line-height') + '|' + el.style.getPropertyPriority('line-height');
+          el.dataset.btxClamped = '1';
+          el.style.setProperty('font-size', CAP + 'px', 'important');
+          el.style.setProperty('line-height', '1.3', 'important');
+        } else if (el.dataset.btxClamped) {
+          const fs = el.dataset.btxFs.split('|');
+          const lh = el.dataset.btxLh.split('|');
+          if (fs[0]) el.style.setProperty('font-size', fs[0], fs[1]); else el.style.removeProperty('font-size');
+          if (lh[0]) el.style.setProperty('line-height', lh[0], lh[1]); else el.style.removeProperty('line-height');
+          delete el.dataset.btxClamped;
+        }
+      });
+    });
+  }
+
+  // Link preview: hover a link in a post. Articles = text card (max 2000 chars). Bitcointalk topics = post viewer with prev/next and page jump.
+  function setupLinkPreview() {
+    if (typeof GM_registerMenuCommand === 'function') {
+      const on = store.get('linkprev', true);
+      GM_registerMenuCommand((LANG === 'id' ? 'Preview link: ' : 'Link preview: ') + (on ? 'ON' : 'OFF'), () => {
+        store.set('linkprev', !on);
+        location.reload();
+      });
+    }
+    if (!store.get('linkprev', true)) return;
+
+    // Cache hanya di memori: kedaluwarsa 1 jam, maksimal 40 entri, hilang saat halaman ditutup
+    const CACHE_TTL = 60 * 60 * 1000;
+    const CACHE_MAX = 40;
+    const mem = new Map();
+    const tmem = new Map();
+    const cget = (map, key) => {
+      const e = map.get(key);
+      if (!e) return null;
+      if (Date.now() - e.t > CACHE_TTL) { map.delete(key); return null; }
+      return e.v;
+    };
+    const cset = (map, key, v) => {
+      map.delete(key);
+      map.set(key, { t: Date.now(), v });
+      while (map.size > CACHE_MAX) map.delete(map.keys().next().value);
+    };
+
+    // Bersihkan cache lama yang pernah tersimpan permanen di versi sebelumnya
+    try {
+      if (Object.keys(store.get('lpcache2', {})).length) store.set('lpcache2', {});
+      if (Object.keys(store.get('lpcache', {})).length) store.set('lpcache', {});
+    } catch (e) {}
+
+    if (typeof GM_registerMenuCommand === 'function') {
+      GM_registerMenuCommand(LANG === 'id' ? 'Hapus cache preview' : 'Clear preview cache', () => {
+        mem.clear();
+        tmem.clear();
+      });
+    }
+    if (!window.matchMedia || !window.matchMedia('(hover:hover)').matches) return;
+
+    if (!document.getElementById('btx-lp-style')) {
+      const st = document.createElement('style');
+      st.id = 'btx-lp-style';
+      st.textContent = [
+        '#btx-lp{position:fixed;z-index:2147483000;display:none;width:400px;max-width:calc(100vw - 16px);box-sizing:border-box;',
+        'background:var(--surface,#fff);color:var(--text,#000);border:1px solid var(--border,#ccc);border-radius:14px;',
+        'box-shadow:0 8px 28px rgba(0,0,0,.28);overflow:hidden;font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}',
+        '#btx-lp.wide{width:600px}',
+        '#btx-lp .im{display:block;width:100%;max-height:170px;object-fit:cover;background:var(--surface2,#eee)}',
+        '#btx-lp .bd{padding:10px 12px;display:grid;gap:6px}',
+        '#btx-lp .sr{display:flex;align-items:center;gap:6px;color:var(--muted,#666);font-size:12px;min-width:0}',
+        '#btx-lp .sr img{width:16px;height:16px;border-radius:4px;flex:none}',
+        '#btx-lp .sr span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+        '#btx-lp .tt{font-weight:700;font-size:14px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}',
+        '#btx-lp .ds{color:var(--muted,#666);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}',
+        '#btx-lp .tx{white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto;color:var(--text,#000);line-height:1.5}',
+        '#btx-lp .mo{justify-self:start;display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:9px;',
+        'background:var(--accent,#476C8E);color:var(--on-accent,#fff)!important;font-weight:700;font-size:12.5px;text-decoration:none}',
+        '#btx-lp .mo:hover{filter:brightness(1.1)}',
+        '#btx-lp .ur{color:var(--accent,#476C8E);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+        '#btx-lp .ld{padding:14px 12px;color:var(--muted,#666)}',
+        /* thread viewer */
+        '#btx-lp .th-h{padding:10px 12px;background:var(--surface2,#eee);border-bottom:1px solid var(--border,#ccc)}',
+        '#btx-lp .th-h b{display:block;color:var(--accent,#476C8E);font-size:14px;overflow-wrap:anywhere}',
+        '#btx-lp .th-h small{display:block;margin-top:2px;color:var(--muted,#666)}',
+        '#btx-lp .th-c{padding:10px 12px;max-height:300px;overflow:auto;overflow-wrap:anywhere;font-size:13px;line-height:1.5}',
+        '#btx-lp .th-c a{color:var(--link,#476C8E)!important;text-decoration:underline}',
+        '#btx-lp .th-c .bm{display:inline-block;padding:1px 6px;border-radius:6px;background:var(--surface2,#eee);color:var(--muted,#666);font-size:11px}',
+        '#btx-lp .th-c .quoteheader{margin:8px 0 0;padding:4px 10px;font-size:11.5px;font-weight:600;',
+        'background:color-mix(in srgb,var(--accent,#476C8E) 10%,var(--quote-bg,#f1f2f4));border:1px solid var(--quote-border,#d0d0e0);',
+        'border-bottom:0;border-left:3px solid var(--accent,#476C8E);border-radius:8px 8px 0 0}',
+        '#btx-lp .th-c .quote{margin:0 0 8px;padding:6px 10px;font-size:12.5px;background:var(--quote-bg,#f1f2f4);',
+        'border:1px solid var(--quote-border,#d0d0e0);border-top:0;border-left:3px solid var(--accent,#476C8E);border-radius:0 0 8px 8px}',
+        '#btx-lp .th-c .quote.cut{max-height:84px;overflow:hidden}',
+        '#btx-lp .th-c .codeheader{margin:8px 0 0;padding:4px 10px;font-size:11.5px;font-weight:600;background:var(--surface2,#eee);border-radius:8px 8px 0 0}',
+        '#btx-lp .th-c .code{margin:0 0 8px;padding:6px 10px;white-space:pre-wrap;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;',
+        'background:var(--quote-bg,#f1f2f4);border-radius:0 0 8px 8px;overflow:auto}',
+        '#btx-lp .th-f{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 10px;border-top:1px solid var(--border,#ccc);background:var(--surface2,#eee)}',
+        '#btx-lp .bt{display:inline-flex;align-items:center;justify-content:center;height:28px;padding:0 11px;border-radius:9px;',
+        'border:1px solid color-mix(in srgb,var(--accent,#476C8E) 45%,transparent);',
+        'background:color-mix(in srgb,var(--accent,#476C8E) 12%,var(--surface,#fff));color:var(--accent,#476C8E)!important;',
+        'font-family:inherit;font-size:12px;font-weight:700;line-height:1;text-decoration:none;cursor:pointer;box-sizing:border-box}',
+        '#btx-lp .bt:hover{background:var(--accent,#476C8E);color:var(--on-accent,#fff)!important}',
+        '#btx-lp .bt[disabled]{opacity:.4;pointer-events:none}',
+        '#btx-lp .ct{color:var(--muted,#666);font-size:12px;margin:0 2px}',
+        '#btx-lp .sp{flex:1}',
+        '#btx-lp .jp{display:flex;gap:4px;margin:0}',
+        '#btx-lp .jp input{width:96px;height:28px;box-sizing:border-box;border-radius:9px;border:1px solid var(--border,#ccc);',
+        'background:var(--surface,#fff);color:var(--text,#000);text-align:center;font-family:inherit;font-size:12px;padding:0 6px}'
+      ].join('');
+      document.head.append(st);
+    }
+
+    const T = LANG === 'id'
+      ? { load: 'Memuat preview\u2026', fail: 'Preview tidak tersedia', limit: 'Batas harian layanan preview tercapai',
+          more: 'Baca selengkapnya \u2192', prev: 'Sebelumnya', next: 'Berikutnya', page: 'Halaman', go: 'Ke', open: 'Buka post',
+          showq: 'Tampilkan quote', hideq: 'Sembunyikan quote' }
+      : { load: 'Loading preview\u2026', fail: 'Preview unavailable', limit: 'Preview service daily limit reached',
+          more: 'Read more \u2192', prev: 'Previous', next: 'Next', page: 'Page', go: 'Go', open: 'Open post',
+          showq: 'Show quote', hideq: 'Hide quote' };
+
+    const API = 'https://lp.gatauwis.workers.dev/?v=2&url=';
+    const SEL = '#bodyarea :is(.post,.btx-pp-body) a[href^="http"]';
+    let card = null, curA = null, showT = null, hideT = null;
+
+    const getCard = () => {
+      if (card) return card;
+      card = h('div', { id: 'btx-lp', role: 'tooltip' });
+      card.addEventListener('mouseenter', () => clearTimeout(hideT));
+      card.addEventListener('mouseleave', () => schedHide());
+      document.body.append(card);
+      return card;
+    };
+    const hide = () => { clearTimeout(showT); if (card) card.style.display = 'none'; curA = null; };
+    const schedHide = () => {
+      clearTimeout(showT); clearTimeout(hideT);
+      hideT = setTimeout(() => {
+        const ae = document.activeElement;
+        if (card && ae && ae.tagName === 'INPUT' && card.contains(ae)) return;
+        hide();
+      }, 220);
+    };
+
+    const place = (a) => {
+      const c = getCard();
+      c.style.left = '0px'; c.style.top = '0px'; c.style.display = 'block';
+      const r = a.getBoundingClientRect();
+      const vw = document.documentElement.clientWidth || window.innerWidth;
+      const vh = window.innerHeight;
+      const w = c.offsetWidth, hh = c.offsetHeight;
+      const left = Math.max(8, Math.min(r.left, vw - w - 8));
+      const top = (r.bottom + 8 + hh <= vh - 8) ? r.bottom + 8 : Math.max(8, r.top - hh - 8);
+      c.style.left = Math.round(left) + 'px';
+      c.style.top = Math.round(top) + 'px';
+    };
+
+    const httpUrl = (u) => {
+      try { return /^https?:$/.test(new URL(u).protocol) ? u : ''; } catch (e) { return ''; }
+    };
+
+    /* ---------- artikel / situs umum (lewat Worker) ---------- */
+
+    const toMeta = (url, j) => {
+      let host = '';
+      try { host = new URL(url).hostname; } catch (e) {}
+      if (!j || j.status !== 'success' || !j.data) return { err: 'fail' };
+      const d = j.data;
+      const title = (d.title || '').trim();
+      return {
+        host, url, title: title || host,
+        desc: (d.description || '').trim(),
+        text: (d.text || '').trim(),
+        more: !!d.truncated,
+        image: httpUrl(d.image && d.image.url),
+        site: d.publisher || host
+      };
+    };
+
+    const viaFetch = (api) => fetch(api, { credentials: 'omit' }).then((r) => {
+      if (r.status === 429) return { status: 'limit' };
+      return r.json();
+    });
+    const viaGM = (api) => new Promise((resolve, reject) => {
+      if (typeof GM_xmlhttpRequest !== 'function') return reject(new Error('no GM'));
+      GM_xmlhttpRequest({
+        method: 'GET', url: api, timeout: 20000,
+        onload: (r) => {
+          if (r.status === 429) return resolve({ status: 'limit' });
+          try { resolve(JSON.parse(r.responseText)); } catch (e) { reject(e); }
+        },
+        onerror: () => reject(new Error('network')),
+        ontimeout: () => reject(new Error('timeout'))
+      });
+    });
+
+
+    // Fallback: read the page straight from the browser when the Worker is blocked
+    const directMeta = (url) => new Promise((resolve) => {
+      if (typeof GM_xmlhttpRequest !== 'function') return resolve(null);
+      GM_xmlhttpRequest({
+        method: 'GET', url, timeout: 15000, anonymous: true,
+        onload: (r) => {
+          if (r.status < 200 || r.status >= 400) return resolve(null);
+          try {
+            const base = r.finalUrl || url;
+            const doc = new DOMParser().parseFromString(r.responseText || '', 'text/html');
+            const m = (...ns) => {
+              for (const n of ns) {
+                const e = doc.querySelector('meta[property="' + n + '"],meta[name="' + n + '"]');
+                const v = e && (e.getAttribute('content') || '').trim();
+                if (v) return v;
+              }
+              return '';
+            };
+            let host = '';
+            try { host = new URL(base).hostname; } catch (e) {}
+            const root = doc.querySelector('article') || doc.querySelector('main') || doc.body;
+            let text = [...root.querySelectorAll('p')].map((p) => txt(p)).filter((s) => s.length >= 40).join('\n\n');
+            let more = false;
+            if (text.length > 2000) { text = text.slice(0, 2000).replace(/\s+\S*$/, '') + '\u2026'; more = true; }
+            let image = '';
+            try { const i = m('og:image', 'twitter:image'); image = i ? new URL(i, base).href : ''; } catch (e) {}
+            const title = m('og:title', 'twitter:title') || (doc.title || '').trim();
+            if (!title && !text) return resolve(null);
+            resolve({
+              host, url, title: title || host,
+              desc: m('og:description', 'twitter:description', 'description'),
+              text, more, image: httpUrl(image), site: m('og:site_name') || host
+            });
+          } catch (e) { resolve(null); }
+        },
+        onerror: () => resolve(null),
+        ontimeout: () => resolve(null)
+      });
+    });
+
+    const fetchMeta = (url) => {
+      const api = API + encodeURIComponent(url);
+      return viaFetch(api).catch(() => viaGM(api)).then((j) => {
+        if (j && j.status === 'limit') return { err: 'limit' };
+        const m = toMeta(url, j);
+        if (!m.err && m.blocked) return directMeta(url).then((d) => d || m);
+        return m;
+      }).catch(() => ({ err: 'fail' }));
+    };
+
+    const render = (a, d) => {
+      const c = getCard();
+      c.classList.remove('wide');
+      if (!d || d.err) { c.replaceChildren(h('div', { class: 'ld' }, d && d.err === 'limit' ? T.limit : T.fail)); place(a); return; }
+      const fav = 'https://www.google.com/s2/favicons?sz=64&domain=' + encodeURIComponent(d.host);
+      const img = d.image ? h('img', { class: 'im', src: d.image, alt: '', referrerpolicy: 'no-referrer', loading: 'lazy' }) : null;
+      if (img) {
+        img.addEventListener('load', () => { if (curA === a) place(a); });
+        img.addEventListener('error', () => { img.remove(); if (curA === a) place(a); });
+      }
+      const body = h('div', { class: 'bd' },
+        h('div', { class: 'sr' }, h('img', { src: fav, alt: '', referrerpolicy: 'no-referrer' }), h('span', {}, d.site || d.host)),
+        d.title && h('div', { class: 'tt' }, d.title),
+        d.text ? h('div', { class: 'tx' }, d.text) : (d.desc && h('div', { class: 'ds' }, d.desc)),
+        d.more && h('a', { class: 'mo', href: d.url, target: '_blank', rel: 'noopener' }, T.more),
+        h('div', { class: 'ur' }, d.url));
+      c.replaceChildren(...[img, body].filter(Boolean));
+      place(a);
+    };
+
+    /* ---------- thread Bitcointalk (fetch langsung, tanpa izin) ---------- */
+
+    // cookie tidak dikirim supaya topik yang di-preview tidak ikut ditandai "sudah dibaca"
+    const getHtml = async (path) => {
+      const r = await fetch(path, { credentials: 'omit' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const buf = await r.arrayBuffer();
+      const cs = ((r.headers.get('content-type') || '').match(/charset=([\w-]+)/i) || [])[1] || 'iso-8859-1';
+      let dec;
+      try { dec = new TextDecoder(cs); } catch (e) { dec = new TextDecoder('iso-8859-1'); }
+      return dec.decode(buf);
+    };
+
+    const lpDate = (v) => {
+      const mo = 'January|February|March|April|May|June|July|August|September|October|November|December';
+      const m = v.match(new RegExp('(?:Today|Yesterday) at \\d{1,2}:\\d{2}:\\d{2} (?:AM|PM)|(?:' + mo + ') \\d{1,2}, \\d{4}, \\d{1,2}:\\d{2}:\\d{2} (?:AM|PM)', 'i'));
+      return m ? m[0] : '';
+    };
+
+    const lpClean = (root) => {
+      root.querySelectorAll('script,style,iframe,form,input,button,video,audio,object,embed').forEach((e) => e.remove());
+      root.querySelectorAll('img').forEach((img) => {
+        const sm = /Smileys/i.test(img.getAttribute('src') || '');
+        img.replaceWith(h('span', { class: 'bm' }, sm ? (img.getAttribute('alt') || '') : '[Image]'));
+      });
+      root.querySelectorAll('*').forEach((e) => {
+        [...e.attributes].forEach((at) => {
+          const n = at.name.toLowerCase();
+          if (n.startsWith('on') || n === 'style' || n === 'id' || n === 'srcset' ||
+            (n === 'href' && /^\s*javascript:/i.test(at.value))) e.removeAttribute(at.name);
+        });
+      });
+    };
+
+    const parseThread = (html) => {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const posts = [];
+      doc.querySelectorAll('td.td_headerandpost').forEach((cell) => {
+        const subj = cell.querySelector('.subject[id^="subject_"]');
+        const post = cell.querySelector('div.post');
+        if (!subj || !post) return;
+        const tbl = cell.closest('table');
+        const num = cell.querySelector('a.message_number');
+        const au = tbl && tbl.querySelector('.poster_info a[href*="action=profile"]');
+        const body = post.cloneNode(true);
+        lpClean(body);
+        posts.push({
+          id: subj.id.replace('subject_', ''),
+          subject: txt(subj),
+          author: txt(au) || '?',
+          number: txt(num),
+          date: lpDate(cell.textContent || ''),
+          href: num ? num.href : '',
+          html: body.innerHTML
+        });
+      });
+
+      let cur = 1, total = 1, per = 0;
+      const pg = [...doc.querySelectorAll('td.middletext')].find((t) => /^\s*Pages:/.test(t.textContent));
+      if (pg) {
+        const bn = [...pg.querySelectorAll('b')].map((x) => parseInt(txt(x), 10)).find((n) => n > 0);
+        if (bn) cur = bn;
+        total = cur;
+        pg.querySelectorAll('a.navPages').forEach((l) => {
+          const n = parseInt(txt(l), 10);
+          if (!(n > 0)) return;
+          total = Math.max(total, n);
+          const m = (l.getAttribute('href') || '').match(/topic=\d+\.(\d+)/);
+          if (m && n > 1 && !per) per = Math.round(parseInt(m[1], 10) / (n - 1));
+        });
+      }
+      const boards = doc.querySelectorAll('.nav a[href*="board="]');
+      return { title: (doc.title || '').trim(), board: txt(boards[boards.length - 1]), posts, cur, total, per };
+    };
+
+    // Returns {tid, msg} when the link is a Bitcointalk topic/post link, otherwise null
+    const threadInfo = (u) => {
+      try {
+        const x = new URL(u);
+        if (!/^(www\.)?bitcointalk\.org$/i.test(x.hostname)) return null;
+        if (/[?&;]action=/.test(x.search)) return null;
+        const m = x.search.match(/[?&;]topic=(\d+)(?:\.(?:msg(\d+)|\d+|new))?/i);
+        return m ? { tid: m[1], msg: m[2] || '' } : null;
+      } catch (e) { return null; }
+    };
+
+    const pageUrl = (tid, page, per) => location.origin + '/index.php?topic=' + tid + '.' + ((page - 1) * per);
+
+    const loadPage = (st, page, where) => {
+      const key = st.tid + ':' + page;
+      const done = (d) => {
+        if (curA !== st.a) return;
+        st.d = d;
+        st.per = d.per || st.per;
+        st.idx = where === 'last' ? d.posts.length - 1 : 0;
+        view(st);
+      };
+      const hit = cget(tmem, key);
+      if (hit) return done(hit);
+      getHtml(pageUrl(st.tid, page, st.per)).then(parseThread).then((d) => {
+        if (!d.posts.length) throw new Error('none');
+        cset(tmem, key, d);
+        done(d);
+      }).catch(() => {
+        if (curA !== st.a) return;
+        const f = getCard().querySelector('.th-c');
+        if (f) f.textContent = T.fail;
+      });
+    };
+
+    const view = (st) => {
+      const c = getCard();
+      const d = st.d;
+      const p = d.posts[st.idx];
+      c.classList.add('wide');
+
+      const content = h('div', { class: 'th-c', html: p.html });
+      content.querySelectorAll('a[href]').forEach((l) => { l.target = '_blank'; l.rel = 'noopener noreferrer'; });
+      content.querySelectorAll('.quote').forEach((q) => {
+        if (txt(q).length <= 300) return;
+        q.classList.add('cut');
+        const b = h('button', { type: 'button', class: 'bt', style: 'margin:0 0 8px', onclick: () => {
+          const collapsed = q.classList.toggle('cut');
+          b.textContent = collapsed ? T.showq : T.hideq;
+          place(st.a);
+        } }, T.showq);
+        q.after(b);
+      });
+
+      const step = (dir) => {
+        const ni = st.idx + dir;
+        if (ni >= 0 && ni < d.posts.length) { st.idx = ni; view(st); return; }
+        const np = d.cur + dir;
+        if (np >= 1 && np <= d.total) loadPage(st, np, dir < 0 ? 'last' : 'first');
+      };
+      const atStart = d.cur <= 1 && st.idx === 0;
+      const atEnd = d.cur >= d.total && st.idx === d.posts.length - 1;
+
+      let jump = null;
+      if (d.total > 1) {
+        const inp = h('input', { type: 'number', min: '1', max: String(d.total), placeholder: T.page + ' ' + d.cur + '/' + d.total, 'aria-label': T.page });
+        jump = h('form', { class: 'jp', onsubmit: (e) => {
+          e.preventDefault();
+          const n = Math.min(d.total, Math.max(1, parseInt(inp.value, 10) || d.cur));
+          if (n !== d.cur) loadPage(st, n, 'first'); else { st.idx = 0; view(st); }
+        } }, inp, h('button', { type: 'submit', class: 'bt' }, T.go));
+      }
+
+      const meta = [d.board, p.author, p.number, idTime(p.date)].filter(Boolean).join(' | ');
+      c.replaceChildren(
+        h('div', { class: 'th-h' }, h('b', {}, d.title || p.subject), h('small', {}, meta)),
+        content,
+        h('div', { class: 'th-f' },
+          h('button', { type: 'button', class: 'bt', disabled: atStart || null, onclick: () => step(-1) }, '\u2039 ' + T.prev),
+          h('span', { class: 'ct' }, (st.idx + 1) + '/' + d.posts.length + ' \u2022 ' + T.page + ' ' + d.cur + '/' + d.total),
+          h('button', { type: 'button', class: 'bt', disabled: atEnd || null, onclick: () => step(1) }, T.next + ' \u203A'),
+          jump,
+          h('span', { class: 'sp' }),
+          h('a', { class: 'bt', href: p.href || st.a.href, target: '_blank', rel: 'noopener' }, T.open)));
+      place(st.a);
+    };
+
+    const openThread = (a, info) => {
+      const c = getCard();
+      c.classList.add('wide');
+      c.replaceChildren(h('div', { class: 'ld' }, T.load));
+      place(a);
+      const x = new URL(a.href);
+      const path = location.origin + x.pathname + x.search;
+      const cached = cget(tmem, path);
+      const ready = cached
+        ? Promise.resolve(cached)
+        : getHtml(path).then(parseThread).then((d) => {
+          if (!d.posts.length) throw new Error('none');
+          cset(tmem, path, d);
+          cset(tmem, info.tid + ':' + d.cur, d);
+          return d;
+        });
+      ready.then((d) => {
+        if (curA !== a) return;
+        const st = { a, tid: info.tid, d, idx: 0, per: d.per || 20 };
+        if (info.msg) {
+          const i = d.posts.findIndex((p) => p.id === info.msg);
+          if (i > -1) st.idx = i;
+        }
+        view(st);
+      }).catch(() => {
+        if (curA !== a) return;
+        c.classList.remove('wide');
+        c.replaceChildren(h('div', { class: 'ld' }, T.fail));
+        place(a);
+      });
+    };
+
+    /* ---------- pemicu hover ---------- */
+
+    const open = (a) => {
+      curA = a;
+      const url = a.href;
+      const info = threadInfo(url);
+      if (info) { openThread(a, info); return; }
+      const c = getCard();
+      const hit = cget(mem, url);
+      if (hit) { render(a, hit); return; }
+      c.classList.remove('wide');
+      c.replaceChildren(h('div', { class: 'ld' }, T.load));
+      place(a);
+      fetchMeta(url).then((d) => {
+        const good = !d.err && !d.blocked && (d.desc || d.text || d.image || (d.title && d.title !== d.host));
+        if (good) cset(mem, url, d);
+        if (curA === a) render(a, d);
+      });
+    };
+
+    document.addEventListener('mouseover', (e) => {
+      const a = e.target.closest && e.target.closest(SEL);
+      if (!a || a.querySelector('img') || !httpUrl(a.href)) return;
+      clearTimeout(hideT);
+      if (a === curA) return;
+      clearTimeout(showT);
+      showT = setTimeout(() => open(a), 450);
+    });
+    document.addEventListener('mouseout', (e) => {
+      const a = e.target.closest && e.target.closest(SEL);
+      if (!a) return;
+      if (e.relatedTarget && card && card.contains(e.relatedTarget)) return;
+      schedHide();
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+    window.addEventListener('scroll', hide, { passive: true });
+  }
+
+  // Writing shortcuts: Ctrl + letter wraps the selected text in BBCode while typing in the reply box
+  const WS_KEYS = [
+    { k: 'b', o: '[b]', c: '[/b]', l: 'wsBold' },
+    { k: 'i', o: '[i]', c: '[/i]', l: 'wsItalic' },
+    { k: 'u', o: '[u]', c: '[/u]', l: 'wsUnder' },
+    { k: 'd', o: '[s]', c: '[/s]', l: 'wsStrike' },
+    { k: 'e', o: '[center]', c: '[/center]', l: 'wsCenter' },
+    { k: 'l', o: '[left]', c: '[/left]', l: 'wsLeft' },
+    { k: 'r', o: '[right]', c: '[/right]', l: 'wsRight' },
+    { k: 'k', o: '[url=]', c: '[/url]', l: 'wsLink', at: 5 },
+    { k: 'm', o: '[img]', c: '[/img]', l: 'wsImage' },
+    { k: 'j', o: '[quote]', c: '[/quote]', l: 'wsQuote' },
+    { k: 'h', o: '[code]', c: '[/code]', l: 'wsCode' }
+  ];
+
+  // Wraps (or unwraps) the selected text with the tag of one shortcut
+  function wsApply(ta, def) {
+    const v = ta.value;
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    const sel = v.slice(s, e);
+    const o = def.o, c = def.c;
+    let from = s, to = e, text, a, b;
+    if (!def.at && sel.length >= o.length + c.length && sel.startsWith(o) && sel.endsWith(c)) {
+      // the selection itself includes the tags: remove them
+      text = sel.slice(o.length, sel.length - c.length);
+      a = from; b = from + text.length;
+    } else if (!def.at && v.slice(s - o.length, s) === o && v.slice(e, e + c.length) === c) {
+      // the tags sit right around the selection: remove them
+      from = s - o.length; to = e + c.length; text = sel;
+      a = from; b = from + sel.length;
+    } else {
+      text = o + sel + c;
+      if (def.at) { a = b = from + def.at; }
+      else { a = from + o.length; b = a + sel.length; }
+    }
+    ta.focus();
+    ta.setSelectionRange(from, to);
+    let ok = false;
+    try { ok = document.execCommand('insertText', false, text); } catch (x) {}
+    if (!ok) {
+      ta.value = v.slice(0, from) + text + v.slice(to);
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    ta.setSelectionRange(a, b);
+  }
+
+    // SHORTCUT SETUP BOSKU
+  let wsBound = false;
+  // Starts the keyboard listener and adds the ON/OFF button and (i) help icon next to the TalkImg button
+  function setupWritingShortcuts() {
+    if (!document.getElementById('btx-ws-style')) {
+      const st = document.createElement('style');
+      st.id = 'btx-ws-style';
+      st.textContent = [
+        '.btx-wsi{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;box-sizing:border-box;',
+        'margin-left:6px;font:italic 700 12px/1 Georgia,serif;cursor:help;user-select:none;',
+        'color:var(--accent)!important;background:color-mix(in srgb,var(--accent) 12%,var(--surface));',
+        'border:1px solid color-mix(in srgb,var(--accent) 45%,transparent)}',
+        '.btx-wsi:hover,.btx-wsi:focus-visible{background:var(--accent);color:var(--on-accent)!important}',
+        '.btx-wsi.off{opacity:.5}',
+        'body.btx-legacy #bodyarea .btx-tki button.btx-wst{margin-left:6px}',
+        'body.btx-legacy #bodyarea .btx-tki button.btx-wst.off{color:var(--muted);background:var(--surface2);border-color:var(--border)}',
+        '@media(max-width:759px){.btx-wsi,.btx-wst{display:none!important}}',
+        '#btx-ws-tip{position:fixed;z-index:2147483000;display:none;box-sizing:border-box;min-width:240px;max-width:calc(100vw - 16px);',
+        'padding:10px 12px;border-radius:14px;background:var(--surface,#fff);color:var(--text,#000);',
+        'border:1px solid var(--border,#ccc);box-shadow:0 8px 28px rgba(0,0,0,.28);',
+        'font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}',
+        '#btx-ws-tip b.h{display:block;font-size:14px}',
+        '#btx-ws-tip small{display:block;margin:2px 0 8px;color:var(--muted,#666)}',
+        '#btx-ws-tip .r{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:2px 0}',
+        '#btx-ws-tip kbd{font:600 11.5px ui-monospace,Menlo,Consolas,monospace;padding:1px 7px;border-radius:6px;',
+        'background:var(--surface2,#eee);border:1px solid var(--border,#ccc)}'
+      ].join('');
+      document.head.append(st);
+    }
+
+    if (!wsBound) {
+      wsBound = true;
+      document.addEventListener('keydown', (e) => {
+        if (!prefs.wshort) return;
+        const t = e.target;
+        if (!t || t.tagName !== 'TEXTAREA' || t.name !== 'message') return;
+        if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+        const def = WS_KEYS.find((x) => x.k === String(e.key).toLowerCase());
+        if (!def) return;
+        e.preventDefault();
+        e.stopPropagation();
+        safe(() => wsApply(t, def));
+      }, true);
+    }
+
+    const mod = /Mac/i.test(navigator.platform || '') ? '\u2318' : 'Ctrl';
+    const stateText = () => (LANG === 'id' ? 'Shortcut: ' : 'Shortcut: ') + (prefs.wshort ? 'ON' : 'OFF');
+    let tip = null, tipSrc = null;
+    const hideTip = () => { if (tip) tip.style.display = 'none'; tipSrc = null; };
+    const showTip = (el) => {
+      if (!tip) {
+        tip = h('div', { id: 'btx-ws-tip', role: 'tooltip' });
+        document.body.append(tip);
+        window.addEventListener('scroll', hideTip, { passive: true });
+      }
+      tip.replaceChildren(
+        h('b', { class: 'h' }, L('wsTitle') + ' \u2022 ' + (prefs.wshort ? 'ON' : 'OFF')),
+        h('small', {}, L('wsHint')),
+        ...WS_KEYS.map((d) => h('div', { class: 'r' }, h('span', {}, L(d.l)), h('kbd', {}, mod + '+' + d.k.toUpperCase()))));
+      tip.style.left = '0px'; tip.style.top = '0px'; tip.style.display = 'block';
+      const r = el.getBoundingClientRect();
+      const vw = document.documentElement.clientWidth || window.innerWidth;
+      const vh = window.innerHeight;
+      const tw = tip.offsetWidth, th = tip.offsetHeight;
+      const left = Math.max(8, Math.min(r.left, vw - tw - 8));
+      const top = (r.bottom + 8 + th <= vh - 8) ? r.bottom + 8 : Math.max(8, r.top - th - 8);
+      tip.style.left = Math.round(left) + 'px';
+      tip.style.top = Math.round(top) + 'px';
+      tipSrc = el;
+    };
+
+    // keeps every ON/OFF button and (i) icon in sync (a page can have more than one reply box)
+    const syncAll = () => {
+      document.querySelectorAll('.btx-wst').forEach((b) => {
+        b.textContent = stateText();
+        b.classList.toggle('off', !prefs.wshort);
+        b.setAttribute('aria-pressed', String(!!prefs.wshort));
+      });
+      document.querySelectorAll('.btx-wsi').forEach((i) => i.classList.toggle('off', !prefs.wshort));
+    };
+
+    document.querySelectorAll('#bodyarea .btx-tki').forEach((bar) => {
+      if (bar.querySelector('.btx-wst')) return;
+
+      const toggleBtn = h('button', { type: 'button', class: 'btx-wst', title: L('wsTitle') });
+      toggleBtn.addEventListener('click', () => {
+        prefs.wshort = !prefs.wshort;
+        store.set('wshort', prefs.wshort);
+        syncAll();
+        if (tipSrc) showTip(tipSrc);
+      });
+
+      const i = h('span', { class: 'btx-wsi', tabindex: '0', role: 'button', 'aria-label': L('wsTitle') }, 'i');
+      i.addEventListener('mouseenter', () => showTip(i));
+      i.addEventListener('mouseleave', hideTip);
+      i.addEventListener('focus', () => showTip(i));
+      i.addEventListener('blur', hideTip);
+      i.addEventListener('click', () => { if (tipSrc === i) hideTip(); else showTip(i); });
+
+      // urutan: [Upload to TalkImg] [Shortcut: ON] (i)
+      const upload = bar.querySelector('button');
+      if (upload) upload.after(toggleBtn, i);
+      else bar.prepend(toggleBtn, i);
+    });
+    syncAll();
+  }
+
+
+  // Indonesian labels for the personal message pages
+  const PM_ID = {
+    'personal messages': 'Pesan Pribadi', 'inbox': 'Kotak Masuk', 'outbox': 'Kotak Keluar',
+    'new message': 'Pesan Baru', 'search messages': 'Cari Pesan', 'manage labels': 'Kelola Label',
+    'prune messages': 'Hapus Pesan Lama', 'messages': 'Pesan', 'labels': 'Label', 'preferences': 'Preferensi'
+  };
+  const pmLabel = (s) => (LANG === 'id' ? (PM_ID[(s || '').trim().toLowerCase()] || s) : s);
+
+  // Turns the message list of an inbox / outbox / label page into modern cards (the form is kept so bulk delete and labels still work)
+  function pmCards(form) {
+    const id = LANG === 'id';
+    const ST_ID = { 'Replied To': 'Dibalas', 'New': 'Baru', 'Unread': 'Belum dibaca' };
+    const ACT_ID = { Quote: 'Kutip', Reply: 'Balas', Delete: 'Hapus' };
+
+    const status = {};
+    form.querySelectorAll('input[id^="deletelisting"]').forEach((cb) => {
+      const tr = cb.closest('tr');
+      const im = tr && tr.querySelector('img[alt]');
+      status[cb.value] = im ? im.getAttribute('alt') : '';
+    });
+
+    const list = h('div', { class: 'btx-pp-list' });
+    form.querySelectorAll('a[name^="msg"]').forEach((mark) => {
+      const blk = mark.nextElementSibling;
+      if (!blk) return;
+      const mid = mark.getAttribute('name').replace('msg', '');
+      const poster = blk.querySelector('td[rowspan="2"]');
+      const author = poster && poster.querySelector(':scope > b > a');
+      const headTd = blk.querySelector('td[width="85%"][height="100%"]');
+      if (!headTd) return;
+      const body = headTd.querySelector('div.personalmessage');
+      if (!body) return;
+
+      const subjEl = headTd.querySelector('td[align="left"] > b');
+      const line = headTd.querySelector('td[align="left"] > div.smalltext');
+      const toA = line && line.querySelector('a');
+      const lt = line ? txt(line).replace(/[\u00AB\u00BB]/g, '').trim() : '';
+      const dm = lt.match(/\son:\s*(.+)$/);
+      const date = dm ? dm[1].trim() : '';
+      const stt = status[mid];
+
+      const crumbs = h('div', { class: 'btx-pp-crumbs' },
+        id ? 'Dari' : 'From', author && h('a', { href: author.href }, txt(author)),
+        h('span', { class: 'sep' }, '\u2192'),
+        id ? 'Kepada' : 'To', toA && h('a', { href: toA.href }, txt(toA)),
+        stt && stt !== 'Read' && h('span', { class: 'btx-tag' }, id ? (ST_ID[stt] || stt) : stt));
+
+      const cb = h('input', { type: 'checkbox', name: 'pms[]', value: mid, class: 'check' });
+      const acts = h('div', { class: 'btx-pp-acts' }, h('label', { class: 'btx-pm-sel' }, cb, id ? 'Pilih' : 'Select'));
+      const aBox = headTd.querySelector('td[nowrap]');
+      if (aBox) {
+        aBox.querySelectorAll('a').forEach((a) => {
+          const label = txt(a);
+          const m = (a.getAttribute('onclick') || '').match(/confirm\('([^']*)'\)/);
+          acts.append(h('a', {
+            href: a.href,
+            onclick: m ? (e) => { if (!window.confirm(m[1])) e.preventDefault(); } : null
+          }, id ? (ACT_ID[label] || label) : label));
+        });
+      }
+      const rep = blk.querySelector('a[href*="sa=report"]');
+      if (rep) acts.append(h('a', { href: rep.href }, id ? 'Laporkan' : 'Report'));
+
+      const sig = blk.querySelector('div.signature');
+      body.classList.add('post');
+      const card = h('article', { class: 'btx-pp-item', id: 'msg' + mid },
+        h('div', { class: 'btx-pp-head' },
+          h('span', { class: 'btx-pp-num' }, (author ? txt(author) : '?').charAt(0).toUpperCase()),
+          h('div', { class: 'btx-pp-hm' }, crumbs, h('span', { class: 'btx-pp-t2' }, txt(subjEl) || '(No subject)')),
+          date && h('span', { class: 'btx-pp-date' }, idTime(date))),
+        h('div', { class: 'btx-pp-body' }, body));
+      if (sig && sigHasContent(sig)) card.append(h('div', { class: 'btx-pm-sig' }, sig));
+      card.append(acts);
+      list.append(card);
+    });
+
+    form.querySelectorAll(':scope > table').forEach((t) => t.remove());
+
+    const bars = [...form.querySelectorAll(':scope > div.bordercolor, :scope > div.tborder')];
+    bars.forEach((bar) => {
+      bar.classList.add('btx-pm-bar');
+      const pgDiv = [...bar.querySelectorAll('div')].find((d) => /^\s*Pages:/.test(d.textContent));
+      if (!pgDiv) return;
+      const pg = pgDiv.querySelector('a.navPages') ? buildPager(parsePager(pgDiv), true) : null;
+      if (pg) pgDiv.replaceChildren(pg); else pgDiv.classList.add('btx-hide');
+    });
+
+    let block;
+    if (list.children.length) {
+      const all = h('input', { type: 'checkbox', class: 'check' });
+      all.addEventListener('change', () => {
+        list.querySelectorAll('input[name="pms[]"]').forEach((c) => { c.checked = all.checked; });
+      });
+      block = [h('label', { class: 'btx-pm-selall' }, all, (id ? 'Pilih semua' : 'Select all') + ' (' + list.children.length + ')'), list];
+    } else {
+      block = [h('p', { class: 'btx-empty' }, id ? 'Tidak ada pesan.' : 'No messages.')];
+    }
+    if (bars[0]) bars[0].after(...block); else form.prepend(...block);
+  }
+
+  // Rebuilds the personal message pages (inbox, outbox, labels, new message, search, manage labels, prune) in the modern profile style with a collapsible MENU on small screens
+  function setupPM() {
+    if (!/[?&;]action=pm(?![\w])/.test(location.search)) return;
+    const bodyarea = document.getElementById('bodyarea');
+    const sideCell = bodyarea && bodyarea.querySelector('td[width="125"]');
+    if (!sideCell || bodyarea.querySelector('.btx-pm')) return;
+    const layout = sideCell.closest('table');
+    const contentCell = [...sideCell.parentElement.children].find((c) => c !== sideCell);
+    if (!layout || !contentCell) return;
+
+    const groups = [];
+    sideCell.querySelectorAll('tr').forEach((tr) => {
+      const hd = tr.querySelector('td.catbg');
+      if (hd) { groups.push({ title: txt(hd), links: [] }); return; }
+      const g = groups[groups.length - 1];
+      if (!g) return;
+      tr.querySelectorAll('a').forEach((a) => g.links.push({ name: txt(a), href: a.href, on: !!a.closest('b') }));
+    });
+
+    const activeLink = groups.reduce((found, g) => found || g.links.find((l) => l.on), null);
+    const activeName = activeLink ? pmLabel(activeLink.name) : '';
+
+    const panel = h('div', { class: 'btx-pm-menupanel' }, groups.filter((g) => g.links.length).map((g) =>
+      h('section', { class: 'btx-pf-card' },
+        h('h2', { class: 'btx-pf-h' }, pmLabel(g.title)),
+        g.links.map((l) => h('a', { class: 'btx-pf-link' + (l.on ? ' on' : ''), href: l.href },
+          h('span', { class: 't' }, pmLabel(l.name)), icon('next'))))));
+
+    const menuBtn = h('button', { type: 'button', class: 'btx-pm-menubtn', 'aria-expanded': 'false' },
+      h('span', { class: 'm' }, 'MENU'),
+      activeName && h('span', { class: 'c' }, activeName),
+      icon('chev'));
+
+    const side = h('aside', { class: 'btx-pp-side' }, menuBtn, panel);
+    menuBtn.addEventListener('click', () => {
+      const open = side.classList.toggle('open');
+      menuBtn.setAttribute('aria-expanded', String(open));
+    });
+
+    const navs = bodyarea.querySelectorAll('div.nav a.nav');
+    const title = navs.length ? pmLabel(txt(navs[navs.length - 1])) : pmLabel('Personal Messages');
+
+    const main = h('div', { class: 'btx-pp-main' });
+    [...contentCell.childNodes].forEach((n) => main.append(n));
+
+    const form = main.querySelector('form[name="pmFolder"]');
+    if (form) {
+      form.classList.add('btx-pm-form');
+      safe(() => pmCards(form));
+    }
+    main.querySelectorAll(':scope > table, :scope > form > table').forEach((t) => t.classList.add('btx-pm-card'));
+
+    const wrap = h('div', { class: 'btx-pp btx-pm' },
+      h('div', { class: 'btx-pp-top' }, h('h1', { class: 'btx-pp-h1' }, title)),
+      main, side);
+    layout.parentNode.insertBefore(wrap, layout);
+    layout.classList.add('btx-hide');
+  }
+
+  // Replaces the members list page with a "no longer published" notice card
+  function setupMemberList() {
+    if (!/[?&;]action=mlist(?![\w])/.test(location.search)) return;
+    const bodyarea = document.getElementById('bodyarea');
+    if (!bodyarea || bodyarea.querySelector('.btx-gone')) return;
+    const id = LANG === 'id';
+    const card = h('section', { class: 'btx-gone', role: 'alert' },
+      h('div', { class: 'btx-gone-code' }, '410'),
+      h('h1', { class: 'btx-gone-t' }, id ? 'Halaman Member Tidak Dipublikasikan Lagi' : 'Member List Is No Longer Published'),
+      h('p', { class: 'btx-gone-d' }, id ? 'Daftar member sudah tidak tersedia di forum ini.' : 'The members list is no longer available on this forum.'),
+      h('a', { class: 'btx-btn primary', href: '/index.php' }, id ? 'Kembali ke Beranda' : 'Back to Home'));
+    [...bodyarea.children].forEach((n) => n.classList.add('btx-hide'));
+    bodyarea.prepend(card);
+  }
+
   // Builds the page footer
   function footer(extra) {
     return h('div', { class: 'btx-foot' }, extra, h('div', {}, L('footer')));
@@ -4338,10 +6497,30 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
       head.news.childNodes.forEach((n) => news.append(n.cloneNode(true)));
       children.push(news);
     }
-    children.push(navEl(head));
-
     const filter = filterField(L('filterBoards'));
-    children.push(h('div', { class: 'btx-tools' }, searchForm(head), blForm(), filter.el));
+    const fSearch = searchForm(head);
+    fSearch.classList.add('btx-d-only');
+    const fBitlist = blForm();
+    if (fBitlist) fBitlist.classList.add('btx-d-only');
+    const mSearch = searchBox(head);
+    mSearch.classList.add('btx-m-only');
+
+    const shortSearch = L('search') + '\u2026';
+    const shortFilter = LANG === 'id' ? 'Filter board\u2026' : 'Filter boards\u2026';
+    const mInput = mSearch.querySelector('input[name="search"]');
+    const mSel = mSearch.querySelector('select');
+    if (mInput) mInput.placeholder = shortSearch;
+    if (mSel) mSel.addEventListener('change', () => { if (mInput) mInput.placeholder = shortSearch; });
+    const mqIdx = window.matchMedia ? window.matchMedia('(max-width:759px)') : null;
+    const setIdxPh = () => {
+      filter.input.placeholder = mqIdx && mqIdx.matches ? shortFilter : L('filterBoards');
+    };
+    setIdxPh();
+    if (mqIdx && mqIdx.addEventListener) mqIdx.addEventListener('change', setIdxPh);
+
+    children.push(h('div', { class: 'btx-boardbar' },
+      navEl(head),
+      h('div', { class: 'btx-tools btx-tools-board' }, fSearch, fBitlist, mSearch, filter.el)));
 
     const catWrap = h('div', { id: 'btx-cats' }, cats.map(categorySection));
     const empty = h('p', { class: 'btx-empty', hidden: true }, L('noBoard'));
@@ -4405,7 +6584,8 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
       h('div', { class: 'btx-t-main' },
         h('a', { class: 'btx-t-title', href: t.href }, t.title),
         tags.length > 0 && h('div', { class: 'btx-tags' }, tags),
-        h('div', { class: 'btx-t-by' }, L('by'), t.starterHref ? h('a', { href: t.starterHref }, t.starter) : t.starter),
+        h('div', { class: 'btx-t-by' }, L('by'), t.starterHref ? h('a', { href: t.starterHref }, t.starter) : t.starter,
+          t.board ? [' \u2022 ', h('a', { href: t.boardHref }, t.board)] : null),
         t.pages.length > 0 && h('div', { class: 'btx-tp' }, t.pages.map((p) => h('a', { href: p.href }, p.name)))
       ),
       h('div', { class: 'btx-t-stats' },
@@ -4418,7 +6598,101 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
 
   // Builds the board page layout
   function buildBoard(bp, head, sheet) {
-    const children = [heroEl(head, true), navEl(head)];
+    // gaya tambahan: baris tombol aksi + sort, pencarian, bar menu+pencarian, kartu parent + child boards
+    if (!document.getElementById('btx-listbar-style')) {
+      const st = document.createElement('style');
+      st.id = 'btx-listbar-style';
+      st.textContent =
+        '.btx-listbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin:10px 0}' +
+        '.btx-listbar .btx-acts{margin:0}' +
+        '.btx-listbar .btx-sorts{margin:0}' +
+        '.btx-tools-board{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}' +
+        '.btx-tools-board .btx-m-only{display:none}' +
+        '.btx-boardbar{zoom:var(--btx-fs-ui,1)}' +
+        '.btx-boardbar .btx-tools,.btx-boardbar .btx-nav{zoom:1}' +
+        /* kartu parent: judul kiri, tombol kanan atas, child board di dalamnya */
+        '.btx-bhead{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:10px 12px}' +
+        '.btx-bhead-t{flex:1 1 200px;min-width:0}' +
+        '.btx-bhead .btx-cb-kids{flex:1 1 100%;min-width:0}' +
+        '.btx-bhead .btx-cb-kids .btx-sec-h{display:none}' +
+        '.btx-bhead .btx-cb-kids .btx-grid{margin-top:2px}' +
+        '.btx-bhead.closed .btx-cb-kids{display:none}' +
+        '.btx-cb-toggle{display:inline-flex;align-items:center;gap:6px;flex:none;height:32px;padding:0 14px;' +
+          'border-radius:10px;border:0;background:var(--accent);color:var(--on-accent);' +
+          'font:700 13px/1 inherit;cursor:pointer;margin:0;' +
+          'box-shadow:0 2px 8px color-mix(in srgb,var(--accent) 40%,transparent)}' +
+        '.btx-cb-toggle:hover{filter:brightness(1.1)}' +
+        '.btx-cb-toggle:active{transform:scale(.97)}' +
+        '@media(min-width:761px){' +
+          '.btx-boardbar{display:block;margin-top:14px}' +
+          /* menu: memenuhi lebar, tinggi 36px */
+          'body.btx .btx-boardbar .btx-nav{display:flex !important;flex-wrap:wrap;gap:8px;margin:0 !important;padding:0;width:100%}' +
+          'body.btx .btx-boardbar .btx-nav a{flex:1 1 auto !important;display:flex !important;align-items:center;justify-content:center;' +
+            'height:36px !important;min-height:0 !important;padding:0 14px !important;font-size:14px !important;border-radius:11px !important;box-sizing:border-box}' +
+          /* pencarian: baris sendiri di bawah menu, lebar dibagi rata, tinggi 36px */
+          'body.btx .btx-boardbar .btx-tools{display:grid !important;grid-auto-flow:column !important;' +
+            'grid-template-columns:none !important;grid-auto-columns:minmax(0,1fr) !important;gap:8px !important;margin:8px 0 0 !important;max-width:none !important}' +
+          'body.btx .btx-boardbar .btx-field{height:36px !important;border-radius:11px !important;padding:0 5px 0 12px !important;gap:6px}' +
+          'body.btx .btx-boardbar .btx-field input{font-size:13.5px}' +
+          'body.btx .btx-boardbar .btx-go{height:28px !important;padding:0 12px !important;font-size:12.5px !important;border-radius:8px !important}' +
+        '}' +
+        /* layar lebar: menu kiri, pencarian kanan, satu baris */
+        '@media(min-width:1100px){' +
+          '.btx-boardbar{display:flex;align-items:center;justify-content:space-between;gap:10px 16px}' +
+          'body.btx .btx-boardbar .btx-nav{width:auto;flex:0 1 auto}' +
+          'body.btx .btx-boardbar .btx-nav a{flex:0 0 auto !important}' +
+          'body.btx .btx-boardbar .btx-tools{margin:0 0 0 auto !important;flex:1 1 640px;max-width:820px}' +
+        '}' +
+        '@media(max-width:759px){' +
+          '.btx-listbar{flex-direction:column;align-items:stretch;gap:10px}' +
+          '.btx-listbar .btx-acts{display:flex;flex-wrap:nowrap;gap:4px;width:100%}' +
+          '.btx-listbar .btx-acts .btx-btn{flex:1 1 auto;min-width:0;justify-content:center;text-align:center;' +
+            'padding:8px 4px;font-size:clamp(10px,3vw,12.5px);white-space:nowrap;border-radius:10px}' +
+          '.btx-tools-board{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:8px}' +
+          '.btx-tools-board .btx-d-only{display:none !important}' +
+          '.btx-tools-board .btx-m-only{display:flex}' +
+          '.btx-tools-board .btx-field{height:44px;padding:0 6px 0 6px;gap:4px}' +
+          '.btx-tools-board .btx-field > .btx-ico{display:none}' +
+          '.btx-tools-board .btx-m-only .btx-go{display:none}' +
+          '.btx-tools-board .btx-sel{flex:none;width:auto;max-width:none;font-size:14px;padding:0 2px}' +
+          '.btx-tools-board .btx-field input{padding-left:2px}' +
+        '}';
+      document.head.append(st);
+    }
+
+    const T = LANG === 'id'
+      ? { show: 'Tampilkan child board', hide: 'Sembunyikan child board' }
+      : { show: 'Show child boards', hide: 'Hide child boards' };
+
+    // kolom pencarian:
+    // desktop = search board | BitList | filter (3 kolom)
+    // mobile  = search gabungan (dropdown) | filter, sebaris
+    const filter = filterField(L('filterTopics'));
+    const fSearch = searchForm(head);
+    fSearch.classList.add('btx-d-only');
+    const fBitlist = blForm();
+    if (fBitlist) fBitlist.classList.add('btx-d-only');
+    const mSearch = searchBox(head);
+    mSearch.classList.add('btx-m-only');
+
+    // placeholder pendek untuk mobile
+    const shortSearch = L('search') + '\u2026';
+    const shortFilter = LANG === 'id' ? 'Filter topik\u2026' : 'Filter topics\u2026';
+    const mInput = mSearch.querySelector('input[name="search"]');
+    const mSel = mSearch.querySelector('select');
+    if (mInput) mInput.placeholder = shortSearch;
+    if (mSel) mSel.addEventListener('change', () => { if (mInput) mInput.placeholder = shortSearch; });
+    const mqBoard = window.matchMedia ? window.matchMedia('(max-width:759px)') : null;
+    const setFilterPh = () => {
+      filter.input.placeholder = mqBoard && mqBoard.matches ? shortFilter : L('filterTopics');
+    };
+    setFilterPh();
+    if (mqBoard && mqBoard.addEventListener) mqBoard.addEventListener('change', setFilterPh);
+
+    const toolsEl = h('div', { class: 'btx-tools btx-tools-board' }, fSearch, fBitlist, mSearch, filter.el);
+
+    // urutan: hero -> menu + pencarian -> breadcrumb -> kartu parent (judul + child boards)
+    const children = [heroEl(head, true), h('div', { class: 'btx-boardbar' }, navEl(head), toolsEl)];
 
     if (bp.crumbs.length) {
       const crumbs = h('nav', { class: 'btx-crumbs', 'aria-label': L('breadcrumb') });
@@ -4429,30 +6703,51 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
       children.push(crumbs);
     }
 
-    children.push(h('section', { class: 'btx-bhead' },
-      h('h1', {}, bp.title),
-      bp.mods && h('p', { class: 'btx-bmod' }, L('moderator') + bp.mods),
-      bp.actions.length > 0 && h('div', { class: 'btx-acts' }, bp.actions.map((a, i) => h('a', {
-        class: 'btx-btn' + (i === 0 ? ' primary' : ''),
-        href: a.href,
-        onclick: a.confirm ? (e) => { if (!window.confirm(a.confirm)) e.preventDefault(); } : null
-      }, ACT_LABEL[a.name] || a.name)))
-    ));
-
-    const filter = filterField(L('filterTopics'));
-    children.push(h('div', { class: 'btx-tools' }, searchForm(head), blForm(), filter.el));
-
+    // kartu parent: judul + moderator (kiri), tombol show/hide (kanan atas, semua mode), child boards di dalamnya
+    const parent = h('section', { class: 'btx-bhead' },
+      h('div', { class: 'btx-bhead-t' },
+        h('h1', {}, bp.title),
+        bp.mods && h('p', { class: 'btx-bmod' }, L('moderator') + bp.mods)
+      )
+    );
     if (bp.children.length) {
-      children.push(h('h2', { class: 'btx-sec-h' }, L('childBoards')), h('div', { class: 'btx-grid' }, bp.children.map(boardCard)));
+      const cbBtn = h('button', { type: 'button', class: 'btx-cb-toggle' });
+      if (!store.get('cbShow', true)) parent.classList.add('closed');
+      const cbSync = () => {
+        const open = !parent.classList.contains('closed');
+        cbBtn.textContent = (open ? '\u25BE ' : '\u25B8 ') + (open ? T.hide : T.show);
+        cbBtn.setAttribute('aria-expanded', String(open));
+      };
+      cbBtn.addEventListener('click', () => {
+        parent.classList.toggle('closed');
+        store.set('cbShow', !parent.classList.contains('closed'));
+        cbSync();
+      });
+      cbSync();
+      parent.append(cbBtn,
+        h('div', { class: 'btx-cb-kids' },
+          h('h2', { class: 'btx-sec-h' }, L('childBoards')),
+          h('div', { class: 'btx-grid' }, bp.children.map(boardCard))));
     }
+    children.push(parent);
 
     children.push(buildPager(bp.pager));
 
+    // baris tombol aksi (kiri) + sort by (kanan), tepat di atas daftar topik
+    const barItems = [];
+    if (bp.actions.length > 0) {
+      barItems.push(h('div', { class: 'btx-acts' }, bp.actions.map((a, i) => h('a', {
+        class: 'btx-btn' + (i === 0 ? ' primary' : ''),
+        href: a.href,
+        onclick: a.confirm ? (e) => { if (!window.confirm(a.confirm)) e.preventDefault(); } : null
+      }, ACT_LABEL[a.name] || a.name))));
+    }
     if (bp.sorts.length) {
-      children.push(h('div', { class: 'btx-sorts' }, h('span', { class: 'lbl' }, L('sortBy')),
+      barItems.push(h('div', { class: 'btx-sorts' }, h('span', { class: 'lbl' }, L('sortBy')),
         bp.sorts.map((s) => h('a', { class: 'btx-sort' + (s.active ? ' on' : ''), href: s.href },
           (SORT_LABEL[s.name] || s.name) + (s.active ? (s.dir === 'up' ? ' \u2191' : ' \u2193') : '')))));
     }
+    if (barItems.length) children.push(h('div', { class: 'btx-listbar' }, barItems));
 
     const list = h('div', { class: 'btx-topics' }, bp.topics.map(topicRow));
     const empty = h('p', { class: 'btx-empty', hidden: !!bp.topics.length }, bp.topics.length ? L('noTopic') : L('emptyBoard'));
@@ -4492,6 +6787,9 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
       const hasChild = [...document.querySelectorAll('#bodyarea td.catbg')].some((td) => /Child Boards/i.test(txt(td)));
       if (hasTopics || hasChild) return 'board';
     }
+    if (/[?&;]action=(?:unread|unreadreplies|recent|watchlist)(?![\w])/.test(q)) {
+      try { if (parseUnreadPage().topics.length) return 'unread'; } catch (e) {}
+    }
     return 'legacy';
   }
 
@@ -4521,8 +6819,8 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
     if (kind === 'index') {
       document.body.classList.add('btx-full');
       document.body.append(buildIndex(cats, head, parseInfo(), sheet));
-    } else if (kind === 'board') {
-      const bp = parseBoardPage();
+    } else if (kind === 'board' || kind === 'unread') {
+      const bp = kind === 'board' ? parseBoardPage() : parseUnreadPage();
       document.body.classList.add('btx-full');
       document.body.append(buildBoard(bp, head, sheet));
     } else {
@@ -4532,6 +6830,8 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
       const navTd = [...document.querySelectorAll('td.maintab_back, td.maintab_active_back')].find((td) => !td.closest('#bodyarea'));
       if (navTd && navTd.closest('table')) navTd.closest('table').classList.add('btx-hide');
       document.body.prepend(buildShell(head, sheet));
+      safe(setupPM);
+      safe(setupMemberList);
       safe(upgradePagers);
       safe(joinThreadHead);
       safe(restylePosts);
@@ -4545,13 +6845,50 @@ body.btx-legacy #bodyarea table.btx-pgbar.btx-pgbar-b{
       safe(setupDividers);
       safe(setupCodeCopy);
       safe(translateLegacyUi);
-	  safe(translateForumMenus);
+      safe(translateForumMenus);
       safe(setupTalkImg);
+      safe(setupLinkPreview);
+      safe(setupWritingShortcuts);
     }
 
     applyPrefs();
     safe(centerPagers);
   }
+
+  // Menjaga ukuran gambar sesuai atribut width/height buatan pembuat post (di post maupun di dalam quote)
+  function fixPostImages() {
+    const isNum = (v) => /^\d+$/.test(String(v || '').trim());
+    document.querySelectorAll('#bodyarea :is(.post, .btx-pp-body) img').forEach((img) => {
+      if (img.dataset.btxSized) return;
+      if (img.closest('.btx-pi, .signature')) return;
+      const wa = img.getAttribute('width');
+      const ha = img.getAttribute('height');
+      const w = isNum(wa) ? parseInt(wa, 10) : 0;
+      const hh = isNum(ha) ? parseInt(ha, 10) : 0;
+      if (!w && !hh) return;
+      img.dataset.btxSized = '1';
+      const st = img.style;
+      st.setProperty('max-width', '100%');
+      if (w && hh) {
+        st.setProperty('width', w + 'px');
+        st.setProperty('height', 'auto');
+        st.setProperty('aspect-ratio', w + ' / ' + hh);
+        st.setProperty('object-fit', 'contain');
+      } else if (w) {
+        st.setProperty('width', w + 'px');
+        st.setProperty('height', 'auto');
+      } else {
+        st.setProperty('height', hh + 'px');
+        st.setProperty('width', 'auto');
+      }
+    });
+  }
+  (function () {
+    const run = () => setTimeout(() => safe(fixPostImages), 0);
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+    else run();
+    window.addEventListener('load', () => safe(fixPostImages));
+  })();
 
   // Starts the script and always reveals the page afterwards
   function start() {
