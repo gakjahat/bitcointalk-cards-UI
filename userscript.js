@@ -3,7 +3,7 @@
 // @namespace    https://bitcointalk.org/
 // @match        https://talkimg.com/*
 // @match        https://www.talkimg.com/*
-// @version      1.5.9.6
+// @version      1.5.9.7
 // @description  Modern, mobile-friendly Bitcointalk UI: index, boards, neat thread posts (uncropped avatars, compact poster card on mobile), a light/dark skin for every other page, and BitList archive search shown right on the page. Language: auto / English / Indonesia.
 // @author       Gak Jahat
 // @match        https://bitcointalk.org/*
@@ -13,6 +13,9 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_xmlhttpRequest
 // @connect      bitlist.co
+// @connect      bpip.org
+// @connect      www.bpip.org
+// @connect      postflayer.onrender.com
 // @connect      lp.gatauwis.workers.dev
 // @connect      update.greasyfork.org
 // @license      Public/Free
@@ -210,10 +213,11 @@
       blFail: 'Could not load BitList results here. Use the button above to open BitList.',
       blNone: 'No results.', blDeleted: 'Deleted', blOf: 'of', blResults: 'results',
       srcForum: 'Forum', srcBoard: 'This board', srcBitlist: 'BitList',
-        fontSize: 'Font size', fontFamily: 'Font', fontDefault: 'Default', fontSans: 'Sans', fontSerif: 'Serif', fontMono: 'Mono',
+      fontSize: 'Font size', fontFamily: 'Font', fontDefault: 'Default', fontSans: 'Sans', fontSerif: 'Serif', fontMono: 'Mono',
       fontTitle: 'Font', fontTarget: 'Apply font to', fxAll: 'All', fxUi: 'Menu & buttons', fxContent: 'Thread & Content', fxCard: 'Board cards',
-              colors: 'Colors', textColor: 'Text color', customColor: 'Custom color', colorDefault: 'Theme default',
-              copy: 'Copy', copied: 'Copied', copyFail: 'Failed',
+      origTpl: 'Original Template w/ Custom Features',
+      colors: 'Colors', textColor: 'Text color', customColor: 'Custom color', colorDefault: 'Theme default',
+      copy: 'Copy', copied: 'Copied', copyFail: 'Failed',
       wsToggle: 'Writing shortcuts (Ctrl + letter in reply box)', wsTitle: 'Writing shortcuts', wsOn: 'ON', wsOff: 'OFF (enable in Settings)',
       wsHint: 'Active only while typing in the reply box. Select text first, or press again to remove the tag.',
       wsBold: 'Bold', wsItalic: 'Italic', wsUnder: 'Underline', wsStrike: 'Strikethrough', wsCenter: 'Center', wsLeft: 'Align left',
@@ -259,7 +263,8 @@
       wsHint: 'Aktif hanya saat mengetik di kotak balasan. Blok teks dulu, atau tekan lagi untuk melepas tag.',
       wsBold: 'Tebal', wsItalic: 'Miring', wsUnder: 'Garis bawah', wsStrike: 'Coret', wsCenter: 'Rata tengah', wsLeft: 'Rata kiri',
       wsRight: 'Rata kanan', wsLink: 'Tautan', wsImage: 'Gambar', wsQuote: 'Kutipan', wsCode: 'Kode',
-        actMap: { 'New Topic': 'Topik baru', 'Post new poll': 'Polling baru', 'Mark Read': 'Tandai dibaca', 'Notify': 'Notifikasi', 'Unnotify': 'Matikan notifikasi', 'Un-notify': 'Matikan notifikasi' },
+      origTpl: 'Template asli dengan fitur tambahan',
+      actMap: { 'New Topic': 'Topik baru', 'Post new poll': 'Polling baru', 'Mark Read': 'Tandai dibaca', 'Notify': 'Notifikasi', 'Unnotify': 'Matikan notifikasi', 'Un-notify': 'Matikan notifikasi' },
       sortMap: { 'Subject': 'Judul', 'Started by': 'Pembuat', 'Replies': 'Balasan', 'Views': 'Dilihat', 'Last post': 'Terakhir' }
     }
   };
@@ -3633,10 +3638,310 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
   body.btx-legacy #bodyarea .btx-gone-t{font-size:18px}
 }
 
+/* ==== Tombol BPIP Stat (topbar): sama seperti tombol lain ==== */
+.btx-bpipbtn.off{opacity:.55}
+
+
+/* ==== Kartu poster: Score, badge DT, dan stat dua kolom ==== */
+body.btx-legacy #bodyarea .btx-pi-stat em{white-space:nowrap;flex:none}
+body.btx-legacy #bodyarea .btx-dt{
+  display:inline-block;margin-left:6px;padding:1px 8px;border-radius:999px;box-sizing:border-box;
+  font-size:11px;font-weight:800;vertical-align:middle;cursor:help;
+  color:var(--link) !important;
+  background:color-mix(in srgb,var(--accent) 14%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--accent) 45%,transparent)}
+body.btx-legacy #bodyarea .btx-pi-score{font-size:12px;line-height:1.35;overflow-wrap:anywhere;cursor:help}
+body.btx-legacy #bodyarea .btx-pi-score em{font-style:normal;color:var(--muted)}
+body.btx-legacy #bodyarea .btx-pi-score b{font-weight:700}
+
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-dt{margin-left:4px;padding:0 6px;font-size:10px}
+  body.btx-legacy #bodyarea .btx-pi-score{grid-area:score;align-self:start;margin-top:3px;font-size:11px;text-align:left}
+  body.btx-legacy #bodyarea .btx-pi{
+    grid-template-areas:"av name" "av rank" "av stars" "av score" "av st" "ex ex" "ac ac";
+    grid-template-rows:auto auto auto auto minmax(0,1fr) auto auto}
+  body.btx-legacy #bodyarea .btx-pi.noav{
+    grid-template-areas:"name" "rank" "stars" "score" "st" "ex" "ac";
+    grid-template-rows:none}
+  body.btx-legacy #bodyarea .btx-pi-stats{
+    display:grid;grid-auto-flow:column;grid-auto-columns:max-content;
+    column-gap:14px;row-gap:1px;justify-content:start;align-content:start;
+    width:auto;max-width:none}
+}
+
+@media(min-width:380px) and (max-width:759px){
+  body.btx-legacy #bodyarea .btx-pi{
+    grid-template-columns:auto minmax(0,1fr) auto;
+    grid-template-areas:"av name st" "av rank st" "av stars st" "av score st" "ex ex ex" "ac ac ac";
+    grid-template-rows:auto auto auto minmax(0,1fr) auto auto}
+  body.btx-legacy #bodyarea .btx-pi.noav{
+    grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:"name st" "rank st" "stars st" "score st" "ex ex" "ac ac";
+    grid-template-rows:none}
+  body.btx-legacy #bodyarea .btx-pi-stats{margin-top:0;align-self:start;justify-content:end}
+}
+
+
+/* ==== Warna Score 4 tingkat ==== */
+:root{--sc-navy:#1d4a9e;--sc-green:var(--trust-pos);--sc-orange:#d97706;--sc-red:var(--trust-neg)}
+:root[data-theme="dark"]{--sc-navy:#8fb4ff;--sc-orange:#fb923c}
+
+
+/* ==== Kartu poster desktop: chip stat grid 2 kolom, EM dan Trust penuh ==== */
+@media(min-width:760px){
+  body.btx-legacy #bodyarea .btx-pi-stats{
+    display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr));
+    grid-template-rows:none !important;grid-auto-flow:row !important;
+    gap:6px;width:100%;margin-top:4px;justify-content:stretch}
+  body.btx-legacy #bodyarea .btx-pi-stat{
+    order:var(--o,0);display:flex;justify-content:center;align-items:baseline;flex-wrap:wrap;
+    width:100%;min-width:0;box-sizing:border-box;padding:3px 4px;gap:3px;
+    text-align:center;white-space:normal;overflow-wrap:anywhere}
+  body.btx-legacy #bodyarea .btx-pi-stat.wide{grid-column:1 / -1}
+}
+
+
+/* ==== Sticky header: logo + (menu & search sebaris) ==== */
+.btx-sticky{position:sticky;top:0;z-index:30;
+  background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.btx-sticky .btx-top{position:static;background:none;
+  backdrop-filter:none;-webkit-backdrop-filter:none;
+  border-bottom:1px solid var(--border)}
+
+/* halaman lain: #btx-app dilepas supaya sticky bekerja di seluruh halaman */
+body.btx-legacy #btx-app{display:contents}
+
+/* baris menu + search, di bawah garis top bar */
+.btx-sticky .btx-boardbar{margin:0 !important;border-bottom:1px solid var(--border);
+  padding:8px calc((100% - var(--btx-maxw))/2 + 14px)}
+
+/* layar lebar: menu kiri, search kanan, satu baris */
+@media(min-width:1100px){
+  html body.btx .btx-sticky .btx-boardbar{display:flex !important;align-items:center;justify-content:space-between;gap:10px 16px}
+  html body.btx .btx-sticky .btx-boardbar .btx-nav{width:auto !important;flex:0 1 auto !important}
+  html body.btx .btx-sticky .btx-boardbar .btx-nav a{flex:0 0 auto !important}
+  html body.btx .btx-sticky .btx-boardbar .btx-tools{margin:0 0 0 auto !important;flex:1 1 640px !important;max-width:820px !important}
+}
+
+/* HP: logo dan menu sticky, search ikut bergulir */
+@media(max-width:759px){
+  .btx-sticky{display:contents}
+  .btx-sticky .btx-boardbar{display:contents !important}
+  .btx-sticky .btx-top{position:sticky;top:0;z-index:31;
+    background:color-mix(in srgb,var(--bg) 88%,transparent);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--border)}
+  .btx-sticky .btx-nav{position:sticky;top:var(--btx-topH,57px);z-index:30;
+    margin:0 !important;padding:8px 14px !important;
+    background:color-mix(in srgb,var(--bg) 88%,transparent);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--border)}
+  .btx-sticky .btx-tools{margin:10px 14px 0 !important}
+  body.btx-compact{--btx-topH:47px}
+}
+
+
+/* ==== Badge Sig ban: chip penuh di bawah Trust ==== */
+body.btx-legacy #bodyarea .btx-pi-stat.btx-sigban{
+  cursor:help;user-select:none;white-space:nowrap;font-weight:700;
+  color:var(--trust-neg) !important;
+  background:color-mix(in srgb,var(--trust-neg) 12%,var(--surface));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--trust-neg) 40%,transparent)}
+@media(hover:hover){
+  body.btx-legacy #bodyarea .btx-pi-stat.btx-sigban:hover{
+    background:color-mix(in srgb,var(--trust-neg) 22%,var(--surface))}
+}
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pi-stat.btx-sigban{
+    padding:1px 8px;border-radius:999px;justify-content:center}
+}
+
+/* paksa kolom cari terlihat di header sticky */
+.btx-sticky .btx-tools{display:grid !important;visibility:visible !important}
+.btx-sticky .btx-tools-board .btx-d-only{display:flex !important}
+.btx-sticky .btx-tools-board .btx-m-only{display:none !important}
+@media(max-width:759px){
+  .btx-sticky .btx-tools-board .btx-d-only{display:none !important}
+  .btx-sticky .btx-tools-board .btx-m-only{display:flex !important}
+}
+
+/* ==== Score: chip dengan border ==== */
+body.btx-legacy #bodyarea .btx-pi-score{
+  display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:4px;
+  width:fit-content;max-width:100%;box-sizing:border-box;
+  padding:2px 10px;border-radius:999px;
+  background:color-mix(in srgb,var(--accent) 8%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--accent) 45%,transparent)}
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pi-score{justify-self:start;justify-content:flex-start;padding:1px 8px}
+}
+
+/* superscript rank */
+body.btx-legacy #bodyarea .btx-sup,
+.btx-sup{font-size:.7em;line-height:0;vertical-align:super;font-weight:inherit}
+
+/* ==== Sidebar sticky: di bawah header, tanpa scroll, kartu bisa collapse ==== */
+@media(min-width:900px){
+  body.btx-legacy #bodyarea .btx-pp-side{
+    top:calc(var(--btx-stkH,72px) + 12px);
+    max-height:none;overflow:visible;align-self:start;padding:0}
+
+  body.btx-legacy #bodyarea .btx-pp-side.btx-acc .btx-pf-h{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    cursor:pointer;user-select:none}
+  body.btx-legacy #bodyarea .btx-pp-side.btx-acc .btx-pf-h::after{
+    content:"";flex:none;width:7px;height:7px;margin-right:2px;
+    border-right:2px solid currentColor;border-bottom:2px solid currentColor;
+    transform:rotate(45deg) translateY(-2px);transition:transform .2s;opacity:.7}
+  body.btx-legacy #bodyarea .btx-pp-side.btx-acc .btx-pf-card.btx-cl > .btx-pf-h::after{
+    transform:rotate(-45deg)}
+  body.btx-legacy #bodyarea .btx-pp-side.btx-acc .btx-pf-card.btx-cl > :not(.btx-pf-h){display:none}
+  body.btx-legacy #bodyarea .btx-pp-side.btx-acc .btx-pf-card.btx-cl > .btx-pf-h{
+    margin-bottom:-4px;border-bottom-color:transparent;
+    border-radius:calc(var(--r-lg) - 1px)}
+}
+
+/* ==== Score: lebar penuh, sejajar dengan chip stat di bawahnya (desktop) ==== */
+@media(min-width:760px){
+  body.btx-legacy #bodyarea .btx-pi-score{
+    width:100%;box-sizing:border-box;justify-content:center;text-align:center;
+    padding:3px 4px}
+}
+
+/* ==== Desktop: Score, chip stat, dan personal text sama lebar ==== */
+@media(min-width:760px){
+  body.btx-legacy #bodyarea .btx-pi-id{width:100%}
+  body.btx-legacy #bodyarea .btx-pi-score,
+  body.btx-legacy #bodyarea .btx-pi-stats,
+  body.btx-legacy #bodyarea .btx-pi-extra{
+    width:100%;box-sizing:border-box}
+}
+
+/* ==== Mobile: Score memenuhi lebar kolomnya, tepi kiri-kanan lurus ==== */
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pi-score{
+    justify-self:stretch;width:auto;box-sizing:border-box;
+    justify-content:center;text-align:center}
+  body.btx-legacy #bodyarea .btx-pi-extra{
+    width:100%;box-sizing:border-box}
+}
+
+/* ==== Mobile: Score satu baris, tanpa border ==== */
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pi-score{
+    display:block;white-space:nowrap;text-align:left;
+    justify-self:start;max-width:100%;
+    overflow:hidden;text-overflow:ellipsis;
+    padding:0;border:0;border-radius:0;background:none;
+    font-size:11.5px;line-height:1.35}
+  body.btx-legacy #bodyarea .btx-pi-score em,
+  body.btx-legacy #bodyarea .btx-pi-score b{display:inline}
+}
+
+/* 380-759px: baris Score melebar ke bawah avatar sampai kolom stat */
+@media(min-width:380px) and (max-width:759px){
+  body.btx-legacy #bodyarea .btx-pi{
+    grid-template-areas:"av name st" "av rank st" "av stars st" "av score score" "ex ex ex" "ac ac ac";
+    grid-template-rows:auto auto auto minmax(0,1fr) auto auto}
+  body.btx-legacy #bodyarea .btx-pi.noav{
+    grid-template-areas:"name st" "rank st" "stars st" "score score" "ex ex" "ac ac";
+    grid-template-rows:none}
+  body.btx-legacy #bodyarea .btx-pi-score{align-self:start;margin-top:4px}
+}
+
+/* ==== Banner news di welcome card ==== */
+.btx-break{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:12px;padding:8px 12px;
+  border-radius:12px;min-width:0;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 22%,var(--surface)),color-mix(in srgb,var(--accent) 6%,var(--surface)));
+  border:1px solid color-mix(in srgb,var(--accent) 50%,transparent);border-left:4px solid var(--accent)}
+.btx-break-tag{flex:none;display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:7px;
+  background:var(--accent);color:var(--on-accent);font-size:11px;font-weight:800;letter-spacing:.08em}
+.btx-break-dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:btxPulse 1.6s ease-in-out infinite}
+@keyframes btxPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+.btx-break-txt{flex:1 1 200px;min-width:0;font-size:13.5px;font-weight:600;color:var(--text);overflow-wrap:anywhere}
+.btx-break-txt b{font-weight:800}
+.btx-break-txt a{color:var(--link) !important;font-weight:700;text-decoration:underline}
+body.btx-compact .btx-break{margin-top:8px;padding:5px 10px}
+
+/* ==== Dropdown Activity ==== */
+.btx-ddtoggle .car{display:inline-block;margin-left:7px;width:6px;height:6px;flex:none;
+  border-right:2px solid currentColor;border-bottom:2px solid currentColor;
+  transform:rotate(45deg) translateY(-2px);transition:transform .2s}
+.btx-ddtoggle.open .car{transform:rotate(-135deg) translate(-1px,-1px)}
+.btx-nav a.btx-ddtoggle.open{
+  background:color-mix(in srgb,var(--accent) 14%,var(--surface));
+  border-color:color-mix(in srgb,var(--accent) 55%,transparent);color:var(--accent) !important}
+#btx-dd{position:fixed;z-index:2147483000;display:none;box-sizing:border-box;min-width:210px;max-width:calc(100vw - 16px);
+  padding:6px;border-radius:14px;background:var(--surface);color:var(--text);
+  border:1px solid var(--border);box-shadow:0 8px 28px rgba(0,0,0,.28);
+  font:600 14px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+#btx-dd a{display:flex;align-items:center;padding:10px 12px;border-radius:9px;
+  color:var(--text) !important;text-decoration:none}
+#btx-dd a:hover,#btx-dd a:focus-visible{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent) !important;outline:0}
+
+/* ==== Mobile: menu utama jadi bar MENU + accordion ==== */
+.btx-mnav{display:none}
+@media(max-width:759px){
+  html body.btx .btx-sticky .btx-nav{display:none !important}
+  .btx-sticky .btx-mnav{
+    display:block;position:sticky;top:var(--btx-topH,57px);z-index:30;margin:0;padding:8px 14px;
+    background:color-mix(in srgb,var(--bg) 88%,transparent);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--border)}
+
+  .btx-mnav-bar{
+    display:flex;align-items:center;gap:10px;width:100%;height:42px;padding:0 12px;box-sizing:border-box;
+    border-radius:12px;cursor:pointer;text-align:left;color:var(--text);
+    font:inherit;font-size:14px;font-weight:700;
+    background:var(--surface);border:1px solid color-mix(in srgb,var(--accent) 45%,var(--border))}
+  .btx-mnav-bar .m{
+    flex:none;display:inline-flex;align-items:center;gap:7px;padding:3px 10px;border-radius:8px;
+    background:var(--accent);color:var(--on-accent);font-size:12px;letter-spacing:.06em}
+  .btx-mnav-bar .c{
+    flex:1;min-width:0;color:var(--muted);font-weight:600;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .btx-mnav-bar > .btx-ico{flex:none;color:var(--muted);transition:transform .2s}
+  .btx-mnav.open .btx-mnav-bar > .btx-ico{transform:rotate(180deg)}
+
+  /* panel: mendorong konten ke bawah, tingginya dibatasi, scroll di dalam kalau kepanjangan */
+  .btx-mnav-panel{
+    display:none;margin-top:8px;padding:10px;border-radius:14px;
+    max-height:min(70vh,calc(100vh - var(--btx-topH,57px) - 70px));
+    max-height:min(70dvh,calc(100dvh - var(--btx-topH,57px) - 70px));
+    overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+    background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow)}
+  .btx-mnav.open .btx-mnav-panel{display:block}
+
+  .btx-mnav-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .btx-mnav-grid a:last-child:nth-child(odd){grid-column:1 / -1}
+  .btx-mnav-grid a,.btx-mnav-out{
+    display:flex;align-items:center;justify-content:center;min-height:42px;padding:0 8px;box-sizing:border-box;
+    border-radius:10px;font-size:14px;font-weight:600;text-align:center;text-decoration:none;
+    color:var(--text) !important;background:var(--surface2);border:1px solid var(--border)}
+  .btx-mnav-grid a.on{background:var(--accent);color:var(--on-accent) !important;border-color:transparent;font-weight:700}
+  .btx-mnav-grid.act a{
+    color:var(--link) !important;
+    background:color-mix(in srgb,var(--accent) 10%,var(--surface));
+    border-color:color-mix(in srgb,var(--accent) 35%,transparent)}
+  .btx-mnav-h{
+    margin:12px 2px 6px;font-size:11.5px;font-weight:700;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--muted)}
+  .btx-mnav-out{width:100%;margin-top:10px}
+
+  body.btx-compact .btx-sticky .btx-mnav{padding:5px 14px}
+  body.btx-compact .btx-mnav-bar{height:36px}
+}
+
+/* ==== Score: selalu satu baris ==== */
+body.btx-legacy #bodyarea .btx-pi-score{
+  display:block;white-space:nowrap;overflow:hidden;text-overflow:clip;text-align:center}
+
 `;
 
   const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
   const prefs = {
+    origtpl: store.get('origtpl', true),
     theme: store.get('theme', 'auto'),
     accent: store.get('accent', 'bitcointalk'),
     compact: store.get('compact', false),
@@ -3649,7 +3954,10 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
     accC: store.get('accC', 'default'),
     txtC: store.get('txtC', 'default'),
     bitlist: store.get('bitlist', true),
-     wshort: store.get('wshort', true),
+    bpip: store.get('bpip', true),
+    pscore: store.get('pscore', true),
+    sigban: store.get('sigban', true),
+    wshort: store.get('wshort', true),
     blinline: store.get('blinline', true),
     fsUi: store.get('fsUi', store.get('fsize', 100)),
     fsPost: store.get('fsPost', store.get('fsize', 100)),
@@ -3752,7 +4060,13 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
       store.set('bitlist', !prefs.bitlist);
       location.reload();
     });
+    GM_registerMenuCommand(L('origTpl') + ': ' + (prefs.origtpl ? 'ON' : 'OFF'), () => {
+      store.set('origtpl', !prefs.origtpl);
+      location.reload();
+    });
   }
+
+
 
   // Returns the active theme as light or dark
   function resolvedTheme() {
@@ -3909,6 +4223,7 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
       h('div', { class: 'btx-row' }, toggle(L('sigOriginal'), 'sig', true)),
       h('div', { class: 'btx-row' }, toggle(L('pinfoRebuild'), 'pinfo', true)),
       h('div', { class: 'btx-row' }, toggle(L('pabbr'), 'pabbr', true)),
+      h('div', { class: 'btx-row' }, toggle(L('origTpl'), 'origtpl', true)),
       h('div', { class: 'btx-row' }, h('button', { class: 'btx-link', onclick: () => { store.set('enabled', false); location.reload(); } },
         L('backOrig')))
     ]);
@@ -3992,23 +4307,42 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
       h('div', { class: 'btx-row' }, h('span', { class: 'lbl' }, L('textColor')), txtRow)
     ]);
 
+    const statS = sheetOf('btx-stat', LANG === 'id' ? 'Info statistik' : 'Stat info', [
+      h('div', { class: 'btx-row' }, toggle('BPIP Stat (Earned Merit, DT, Recognition Rank)', 'bpip', true)),
+      h('div', { class: 'btx-row' }, toggle('Nutildah Postflayer Score', 'pscore', true)),
+      h('div', { class: 'btx-row' }, toggle('Sigban Info', 'sigban', true)),
+      h('p', { class: 'btx-sub' }, LANG === 'id' ? 'Halaman dimuat ulang setelah saklar diubah.' : 'The page reloads after a switch is changed.')
+    ]);
+
     return {
       overlay: main.overlay,
       open: main.open,
       openLang: langS.open,
       openFont: fontS.open,
       openColor: palS.open,
-      others: [langS.overlay, fontS.overlay, palS.overlay]
+      openStat: statS.open,
+      others: [langS.overlay, fontS.overlay, palS.overlay, statS.overlay]
     };
   }
 
+  const BPIP_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="8" r=".6" fill="currentColor"/></svg>';
+
   // Builds the sticky top bar with brand and tool buttons
   function makeTopbar(sheet) {
+    const statOn = !!(prefs.bpip || prefs.pscore || prefs.sigban);
+    const statLabel = LANG === 'id' ? 'Info statistik' : 'Stat info';
     return h('header', { class: 'btx-top' },
       h('a', { class: 'btx-brand', href: '/index.php' }, h('span', { class: 'btx-logo' }, '\u20BF'), h('span', { class: 'btx-bname' }, 'BitcoinTalk', h('span', { class: 'btx-btag' }, ' | Bitcoin Forum'))),
       h('button', { class: 'btx-iconbtn', 'aria-label': L('language'), title: L('language'), onclick: sheet.openLang }, icon('lang')),
       h('button', { class: 'btx-iconbtn', 'aria-label': L('fontTitle'), title: L('fontTitle'), onclick: sheet.openFont }, icon('font')),
       h('button', { class: 'btx-iconbtn', 'aria-label': L('accent'), title: L('accent'), onclick: sheet.openColor }, icon('palette')),
+      h('button', {
+        class: 'btx-iconbtn btx-bpipbtn ' + (statOn ? 'on' : 'off'),
+        id: 'btx-bpip-btn',
+        'aria-label': statLabel,
+        title: statLabel,
+        onclick: sheet.openStat
+      }, h('span', { class: 'btx-ico', html: BPIP_ICON })),
       h('button', { class: 'btx-iconbtn', id: 'btx-theme-btn', 'aria-label': L('toggleTheme'), onclick: () => {
         setPref('theme', resolvedTheme() === 'dark' ? 'light' : 'dark');
         sheet.overlay.querySelectorAll('.btx-seg button').forEach((x, i) => x.classList.toggle('on', ['auto', 'light', 'dark'][i] === prefs.theme));
@@ -4032,11 +4366,106 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
     return t ? t + (m[2] || '') : s;
   };
 
+let ddEl = null, ddBtn = null, ddBound = false;
+// Menutup dropdown Activity
+function hideDd() {
+  if (ddEl) ddEl.style.display = 'none';
+  if (ddBtn) { ddBtn.classList.remove('open'); ddBtn.setAttribute('aria-expanded', 'false'); }
+}
+// Membuat tombol dropdown Activity untuk menu utama
+function ddToggle(head) {
+  const label = LANG === 'id' ? 'Aktivitas' : 'Activity';
+  const btn = h('a', { href: '#', class: 'btx-ddtoggle', role: 'button', 'aria-haspopup': 'true', 'aria-expanded': 'false' },
+    label, h('span', { class: 'car' }));
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (ddBtn === btn && ddEl && ddEl.style.display === 'block') { hideDd(); return; }
+    hideDd();
+    if (!ddEl || !ddEl.isConnected) {
+      ddEl = h('div', { id: 'btx-dd', role: 'menu' });
+      (document.getElementById('btx-app') || document.body).append(ddEl);
+    }
+    if (!ddBound) {
+      ddBound = true;
+      document.addEventListener('click', (ev) => {
+        if (!(ev.target.closest && ev.target.closest('#btx-dd, .btx-ddtoggle'))) hideDd();
+      });
+      document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') hideDd(); });
+      window.addEventListener('resize', hideDd);
+    }
+    ddEl.replaceChildren(...head.links.map((l) => h('a', { href: l.href, role: 'menuitem' }, l.name)));
+    ddEl.style.left = '0px';
+    ddEl.style.top = '0px';
+    ddEl.style.display = 'block';
+    const r = btn.getBoundingClientRect();
+    const vw = document.documentElement.clientWidth || window.innerWidth;
+    const w = ddEl.offsetWidth;
+    ddEl.style.left = Math.round(Math.max(8, Math.min(r.left, vw - w - 8))) + 'px';
+    ddEl.style.top = Math.round(r.bottom + 6) + 'px';
+    ddBtn = btn;
+    btn.classList.add('open');
+    btn.setAttribute('aria-expanded', 'true');
+  });
+  return btn;
+}
+
   // Builds the main navigation chips
-  function navEl(head) {
-    if (!head.nav.length) return null;
-    return h('nav', { class: 'btx-nav', 'aria-label': L('mainNav') },
-      head.nav.map((n) => h('a', { class: n.active ? 'on' : '', href: n.href }, navLabel(n.name))));
+// Mobile: menu utama jadi bar "MENU" + accordion (Activity dan Logout ikut di dalamnya)
+function mobileNavEl(head) {
+  const isOut = (n) => /action=logout/i.test(n.href) || /^log\s?out$/i.test(n.name.trim());
+  const main = head.nav.filter((n) => !isOut(n));
+  const out = head.nav.find(isOut);
+  const active = head.nav.find((n) => n.active) || head.nav[0];
+
+  const wrap = h('div', { class: 'btx-mnav' });
+  const bar = h('button', { type: 'button', class: 'btx-mnav-bar', 'aria-expanded': 'false', 'aria-label': 'MENU' },
+    h('span', { class: 'm' },
+      h('span', { class: 'btx-ico', html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>' }),
+      'MENU'),
+    h('span', { class: 'c' }, navLabel(active.name)),
+    icon('chev'));
+
+  const panel = h('div', { class: 'btx-mnav-panel' },
+    h('div', { class: 'btx-mnav-grid' },
+      main.map((n) => h('a', { class: n.active ? 'on' : '', href: n.href }, navLabel(n.name)))),
+    head.links.length > 0 && h('div', { class: 'btx-mnav-h' }, LANG === 'id' ? 'Aktivitas' : 'Activity'),
+    head.links.length > 0 && h('div', { class: 'btx-mnav-grid act' },
+      head.links.map((l) => h('a', { href: l.href }, l.name))),
+    out && h('a', { class: 'btx-mnav-out', href: out.href }, navLabel(out.name)));
+
+  const setOpen = (o) => {
+    wrap.classList.toggle('open', o);
+    bar.setAttribute('aria-expanded', String(o));
+  };
+  bar.addEventListener('click', (e) => { e.stopPropagation(); setOpen(!wrap.classList.contains('open')); });
+  panel.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('a')) setOpen(false); });
+  document.addEventListener('click', (e) => { if (!wrap.contains(e.target)) setOpen(false); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+
+  wrap.append(bar, panel);
+  return wrap;
+}
+
+// Membuat menu utama: versi desktop (chip) + versi mobile (bar MENU)
+function navEl(head) {
+  if (!head.nav.length) return null;
+  const items = head.nav.map((n) => h('a', { class: n.active ? 'on' : '', href: n.href }, navLabel(n.name)));
+  if (head.links.length) {
+    const i = head.nav.findIndex((n) => /action=logout/i.test(n.href) || /^log\s?out$/i.test(n.name.trim()));
+    const dd = ddToggle(head);
+    if (i > -1) items.splice(i, 0, dd); else items.push(dd);
+  }
+  const nav = h('nav', { class: 'btx-nav', 'aria-label': L('mainNav') }, items);
+  return [nav, mobileNavEl(head)];
+}
+
+  // Builds the sticky header: top bar (logo + tools), then one row with the main menu and the search
+  function stickyHead(head, sheet, tools) {
+    const nav = navEl(head);
+    return h('div', { class: 'btx-sticky' },
+      makeTopbar(sheet),
+      (nav || tools) && h('div', { class: 'btx-boardbar' }, nav, tools));
   }
 
   // Builds the quick link row (unread, replies, patrol, watchlist)
@@ -4257,12 +4686,254 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
     if (first) first.classList.add('btx-firstpost');
   }
 
-  // Builds an uppercase initials label from a stat name, one letter per word
+  const STAT_ABBR = { 'earned merit 120d': 'EM', 'dt': 'DT', 'rank': 'RR' };
+  const X_TTL = 6 * 60 * 60 * 1000;
+  const X_MAX = 400;
+  const xCache = (() => { const v = store.get('xstat', {}); return v && typeof v === 'object' ? v : {}; })();
+  const xPending = {};
+  const xFail = {};
+  const xChain = { forum: Promise.resolve(), bpip: Promise.resolve(), score: Promise.resolve() };
+  let xSaveTimer = null;
+
+  // Builds the short label of a stat: fixed labels for extra stats, initials for the others
   function statAbbr(name) {
+    const fixed = STAT_ABBR[String(name || '').toLowerCase()];
+    if (fixed) return fixed;
     const words = String(name || '').split(/[\s_\-\/.]+/).filter(Boolean);
     if (!words.length) return '';
     if (words.length === 1) return words[0].charAt(0).toUpperCase();
     return words.slice(0, 3).map((w) => w.charAt(0)).join('').toUpperCase();
+  }
+
+  // Returns the cached extra stat record of a user
+  function xGet(uid) {
+    return uid && xCache[uid] ? xCache[uid] : null;
+  }
+
+  // Saves the extra stat cache (debounced) and trims the oldest entries
+  function xSave() {
+    clearTimeout(xSaveTimer);
+    xSaveTimer = setTimeout(() => {
+      const keys = Object.keys(xCache);
+      if (keys.length > X_MAX) {
+        keys.sort((a, b) => (xCache[a].t || 0) - (xCache[b].t || 0)).slice(0, keys.length - X_MAX).forEach((k) => { delete xCache[k]; });
+      }
+      store.set('xstat', xCache);
+    }, 800);
+  }
+
+  // Runs a job on a named queue with a pause after each job
+  function xRun(name, gap, fn) {
+    const job = xChain[name].then(fn);
+    xChain[name] = job.catch(() => {}).then(() => new Promise((r) => setTimeout(r, gap)));
+    return job;
+  }
+
+  // Fetches the merit summary of a user and sums the merit received in the last 120 days
+  function xMerit(uid) {
+    return xRun('forum', 400, async () => {
+      const r = await fetch(location.origin + '/index.php?action=merit;u=' + uid, { credentials: 'include' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
+      const head = [...doc.querySelectorAll('h3')].find((x) => /^\s*Received in the last/i.test(x.textContent));
+      if (!head) {
+        if (/Merit summary/i.test(doc.title)) return 0;
+        throw new Error('no merit page');
+      }
+      const list = head.nextElementSibling;
+      if (!list || list.tagName !== 'UL') return 0;
+      let sum = 0;
+      list.querySelectorAll('li').forEach((li) => {
+        const m = li.textContent.match(/(?:AM|PM):\s*(\d+)\s+from\b/i);
+        if (m) sum += parseInt(m[1], 10);
+      });
+      return sum;
+    });
+  }
+
+  // Fetches the forum profile of a user and reads the signature ban date (empty text = not banned)
+  function xSigBan(uid) {
+    return xRun('forum', 400, async () => {
+      const r = await fetch(location.origin + '/index.php?action=profile;u=' + uid, { credentials: 'include' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const html = await r.text();
+      const m = html.match(/Banned from displaying signatures until\s+([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})/i);
+      return m ? m[1] + '|' + m[2] + '|' + m[3] : '';
+    });
+  }
+
+  // Fetches the BPIP profile of a user and reads DT status and recognition rank
+  function xBpip(uid) {
+    return xRun('bpip', 500, () => new Promise((resolve, reject) => {
+      if (typeof GM_xmlhttpRequest !== 'function') return reject(new Error('no GM_xmlhttpRequest'));
+      GM_xmlhttpRequest({
+        method: 'GET',
+        url: 'https://bpip.org/Profile?id=' + uid,
+        timeout: 20000,
+        anonymous: true,
+        onload: (r) => {
+          if (r.status < 200 || r.status >= 300) return reject(new Error('HTTP ' + r.status));
+          try {
+            const doc = new DOMParser().parseFromString(r.responseText || '', 'text/html');
+            const badge = doc.querySelector('td.lh-0 .badge');
+            const row = [...doc.querySelectorAll('tr')].find((tr) => tr.children[0] && /^Rank$/i.test(txt(tr.children[0])));
+            const link = row && row.querySelector('a[href*="mostrecognized"]');
+            if (!badge && !row && !doc.querySelector('td.lh-0')) return reject(new Error('no profile'));
+            resolve({
+              dt: badge ? txt(badge) : 'Non-DT',
+              dtTip: badge ? (badge.getAttribute('data-original-title') || badge.getAttribute('title') || '') : '',
+              rr: link ? txt(link) : null
+            });
+          } catch (e) { reject(e); }
+        },
+        onerror: () => reject(new Error('network')),
+        ontimeout: () => reject(new Error('timeout'))
+      });
+    }));
+  }
+
+    // Fetches the post health score of a user from Postflayer
+  function xScore(uid) {
+    return xRun('score', 300, () => new Promise((resolve, reject) => {
+      if (typeof GM_xmlhttpRequest !== 'function') return reject(new Error('no GM_xmlhttpRequest'));
+      GM_xmlhttpRequest({
+        method: 'GET',
+        url: 'https://postflayer.onrender.com/score/' + uid,
+        timeout: 45000,
+        anonymous: true,
+        headers: { Accept: 'application/json' },
+        onload: (r) => {
+          if (r.status === 404) return resolve('');
+          if (r.status < 200 || r.status >= 300) return reject(new Error('HTTP ' + r.status));
+          try {
+            const j = JSON.parse(r.responseText || '{}');
+            resolve(j && j.score_band ? String(j.score_band) : '');
+          } catch (e) { reject(e); }
+        },
+        onerror: () => reject(new Error('network')),
+        ontimeout: () => reject(new Error('timeout'))
+      });
+    }));
+  }
+
+  // Shortens a rank like "1234th" to "1.2K" when it is 1000 or more
+  function xRank(raw) {
+    const m = String(raw || '').match(/\d[\d.,]*/);
+    if (!m) return String(raw || '').trim();
+    const n = parseInt(m[0].replace(/[.,]/g, ''), 10);
+    if (!(n >= 1000)) return String(raw).trim();
+    const k = Math.floor(n / 100) / 10;
+    return (k % 1 === 0 ? String(k) : k.toFixed(1)) + 'K';
+  }
+
+  // Turns the raw score band text into a short "10% • Label" text and a four level color
+  function xScoreView(raw) {
+    const text = String(raw || '').trim();
+    const pct = text.match(/(\d+(?:\.\d+)?)\s*%/);
+    const label = text
+      .replace(/\(.*$/, '')
+      .replace(/\d+(?:\.\d+)?\s*%/g, '')
+      .replace(/[\u2022\-\u2013:]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const w = label.toLowerCase();
+    let color = '';
+    if (/\b(elite|excellent|outstanding)\b/.test(w)) color = 'var(--sc-navy)';
+    else if (/\b(good|great|strong|healthy)\b/.test(w)) color = 'var(--sc-green)';
+    else if (/\b(fair|moderate|average|okay|needs|improve|improvement|caution|mixed)\b/.test(w)) color = 'var(--sc-orange)';
+    else if (/\b(poor|bad|critical|weak|risk|danger)\b/.test(w)) color = 'var(--sc-red)';
+    else if (pct) {
+      const n = parseFloat(pct[1]);
+      color = n <= 10 ? 'var(--sc-navy)' : (n <= 30 ? 'var(--sc-green)' : (n <= 60 ? 'var(--sc-orange)' : 'var(--sc-red)'));
+    }
+    const v = pct && label ? pct[1] + '% \u2022 ' + label : text;
+    return { v, color };
+  }
+
+  // Loads extra stats of a user once and calls back when new data arrived
+  function xLoad(uid, done) {
+    if (!uid) return;
+    const hit = xCache[uid];
+    const fresh = !!hit && Date.now() - hit.t < X_TTL;
+    const needB = prefs.bpip && !(fresh && hit.em !== undefined);
+    const needS = prefs.pscore && !(fresh && hit.sc !== undefined);
+    const needX = prefs.sigban && !(fresh && hit.sb !== undefined);
+    if (xFail[uid] || (!needB && !needS && !needX)) return;
+    if (xPending[uid]) { xPending[uid].push(done); return; }
+    xPending[uid] = [done];
+    const rec = fresh ? Object.assign({}, hit) : { t: Date.now() };
+    rec.t = Date.now();
+    const hasData = () => (rec.em !== null && rec.em !== undefined) || !!rec.dt || !!rec.sc || typeof rec.sb === 'string';
+    const push = () => {
+      if (hasData()) xCache[uid] = rec;
+      (xPending[uid] || []).slice().forEach((f) => safe(f));
+    };
+    const jobs = [];
+    if (needX) {
+      jobs.push(xSigBan(uid).then((v) => { rec.sb = v; push(); }, () => {}));
+    }
+    if (needB) {
+      rec.em = null; rec.dt = null; rec.dtTip = ''; rec.rr = null;
+      jobs.push(
+        xMerit(uid).then((v) => { rec.em = v; push(); }, () => {}),
+        xBpip(uid).then((v) => { rec.dt = v.dt; rec.dtTip = v.dtTip; rec.rr = v.rr; push(); }, () => {})
+      );
+    }
+    if (needS) {
+      rec.sc = '';
+      jobs.push(xScore(uid).then((v) => { rec.sc = v; push(); }, () => {}));
+    }
+    Promise.all(jobs).then(() => {
+      if (hasData()) xSave();
+      else xFail[uid] = true;
+      delete xPending[uid];
+    });
+  }
+
+  // Turns a cached record into the list of extra stats in display order; on poster cards DT is shown only for DT members
+  function xExtraStats(ex, forPoster) {
+    const out = [];
+    if (prefs.pscore && ex.sc) {
+      const sv = xScoreView(ex.sc);
+      out.push({ k: 'Score', v: sv.v, color: sv.color, full: 'Nutildah Postflayer Score' });
+    }
+    if (prefs.bpip) {
+      if (ex.em !== null && ex.em !== undefined) out.push({ k: 'Earned Merit 120D', v: String(ex.em) });
+      if (ex.dt && (!forPoster || /^DT\d/i.test(ex.dt))) out.push({ k: 'DT', v: ex.dt, tip: ex.dtTip });
+      if (ex.rr) out.push({ k: 'Rank', v: xRank(ex.rr), full: 'BPIP Recognition Rank' });
+    }
+    return out;
+  }
+
+  // Returns the forum user id of a poster cell
+  function posterUid(td) {
+    const a = td.querySelector('a[href*="action=profile"]');
+    const m = a && a.href.match(/[?&;]u=(\d+)/);
+    return m ? m[1] : '';
+  }
+
+  // Returns the forum user id of the profile being viewed
+  function profileUid(d) {
+    const re = /[?&;]u=(\d+)/;
+    const m = ((d && d.meritHref) || '').match(re) ||
+      ((d && d.trustHref) || '').match(re) ||
+      ((d && d.postsHref) || '').match(re) ||
+      location.search.match(re);
+    return m ? m[1] : '';
+  }
+
+  // Builds the extra stat tiles for the profile summary, keyed by stat
+  function profileExtraTiles(d, tile) {
+    const out = {};
+    if (!prefs.bpip && !prefs.pscore) return out;
+    const ex = xGet(profileUid(d));
+    if (!ex) return out;
+    xExtraStats(ex).forEach((s) => {
+      const key = s.k === 'Score' ? 'score' : (s.k === 'Earned Merit 120D' ? 'em' : (s.k === 'DT' ? 'dt' : (s.k === 'Rank' ? 'rank' : '')));
+      if (!key) return;
+      out[key] = tile(s.k, h('span', { title: s.full || s.tip || null, style: s.color ? 'color:' + s.color : null }, s.k === 'Rank' ? supOrd(s.v) : s.v), '', key === 'score' ? 'score' : '');
+    });
+    return out;
   }
 
   let statTipEl = null, statTipSrc = null, statTipTimer = null, statTipBound = false;
@@ -4285,7 +4956,7 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
     }
     if (!statTipBound) {
       statTipBound = true;
-      document.addEventListener('click', (ev) => { if (!(ev.target.closest && ev.target.closest('.btx-pi-stat.ab'))) hideStatTip(); });
+      document.addEventListener('click', (ev) => { if (!(ev.target.closest && ev.target.closest('.btx-pi-stat.ab, .btx-pi-score, .btx-sigban'))) hideStatTip(); });
       window.addEventListener('scroll', hideStatTip, { passive: true });
       window.addEventListener('resize', hideStatTip);
     }
@@ -4330,13 +5001,115 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
   }
   const paintTrustIn = (scope) => scope.querySelectorAll('.btx-pf-tile.trust .val').forEach(paintTrust);
 
-  // Builds the value of one poster stat; Trust keeps its own green/red colors
-  function statVal(s) {
-    const isTrust = /^trust$/i.test(s.k);
-    const b = h('b', { style: !isTrust && s.color ? 'color:' + s.color : null }, s.v);
-    if (isTrust) paintTrust(b);
-    return b;
+// Mengubah "523rd" menjadi 523 + <sup>rd</sup>
+function supOrd(v) {
+  const m = String(v).match(/^(\D*\d[\d.,]*)\s*(st|nd|rd|th)$/i);
+  if (!m) return String(v);
+  const f = document.createDocumentFragment();
+  f.append(m[1], h('sup', { class: 'btx-sup' }, m[2]));
+  return f;
+}
+
+// ==========================================
+// 1. FUNGSI UTAMA: fitScores (Menyesuaikan ukuran font skor)
+// ==========================================
+function fitScores(root) {
+  (root || document).querySelectorAll('.btx-pi-score').forEach((el) => {
+    const b = el.querySelector('b');
+    if (!b || !el.clientWidth) return;
+
+    if (b.dataset.full === undefined) {
+      b.dataset.full = b.textContent;
+    }
+
+    const full = b.dataset.full;
+    b.textContent = full;
+    el.style.fontSize = '';
+
+    const base = parseFloat(getComputedStyle(el).fontSize) || 12;
+    const over = () => el.scrollWidth > el.clientWidth + 1;
+
+    const shrink = (min) => {
+      let fs = base;
+      while (over() && fs > min) {
+        fs -= 0.5;
+        el.style.fontSize = fs + 'px';
+      }
+    };
+
+    shrink(10.5);
+
+    if (over() && /\bAverage\b/i.test(full)) {
+      b.textContent = full.replace(/\bAverage\b/i, 'Avg');
+      el.style.fontSize = '';
+      shrink(9);
+    } else if (over()) {
+      shrink(9);
+    }
+
+    const abbreviated = b.textContent !== full;
+    const tip = 'Nutildah Postflayer Score' + (abbreviated ? ': ' + full : '');
+    el.title = tip;
+    el.setAttribute('data-full', tip);
+  });
+}
+
+// ==========================================
+// 2. FUNGSI SETUP: Menjalankan fitScores saat ukuran layar / font berubah
+// ==========================================
+function setupScoreFit() {
+  let t = null;
+  const later = () => {
+    clearTimeout(t);
+    t = setTimeout(() => fitScores(), 120);
+  };
+
+  window.addEventListener('resize', later);
+  window.addEventListener('load', later);
+
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(later);
   }
+
+  fitScores();
+}
+
+// ==========================================
+// 3. FUNGSI STATVAL: Membangun nilai poster stat
+// ==========================================
+function statVal(s) {
+  const isTrust = /^trust$/i.test(s.k);
+  const val = /^rank$/i.test(s.k) ? supOrd(s.v) : s.v;
+  const b = h('b', { style: !isTrust && s.color ? 'color:' + s.color : null }, val);
+
+  if (isTrust) {
+    paintTrust(b);
+  }
+
+  return b;
+}
+
+// ==========================================
+// 4. FUNGSI SIGBANINFO: Informasi tooltip Sigban dari cache profile
+// ==========================================
+function sigBanInfo(td) {
+  if (typeof prefs === 'undefined' || !prefs.sigban) return '';
+
+  const ex = xGet(posterUid(td));
+  const raw = ex && ex.sb;
+  if (!raw) return '';
+
+  const p = raw.split('|');
+  const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const mon = monthNames.indexOf(p[0].slice(0, 3).toLowerCase()) + 1;
+
+  if (!mon) return '';
+
+  const two = (n) => String(n).padStart(2, '0');
+  const langCheck = (typeof LANG !== 'undefined' && LANG === 'id');
+
+  return (langCheck ? 'Sigban sampai ' : 'Sigban until ') + two(mon) + '-' + two(p[1]) + '-' + p[2];
+}
 
   // Builds the poster info card from clones of the original poster info
   function posterCard(td) {
@@ -4421,16 +5194,53 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
 
     const extra = extraLines.map((l) => h('div', {}, l));
 
+    const xs = xGet(posterUid(td));
+    let dtBadge = null;
+    const sbTip = sigBanInfo(td);
+    const sbBadge = sbTip
+      ? h('span', { class: 'btx-pi-stat wide btx-sigban', style: '--o:99', title: sbTip, 'data-full': sbTip, onclick: toggleStatTip }, '\uD83D\uDEAB Sig ban')
+      : null;
+    if (xs) {
+      xExtraStats(xs, true).forEach((s) => {
+        if (s.k === 'Score') addStat(s.k, s.v, s.color);
+        else if (s.k === 'DT') dtBadge = h('span', { class: 'btx-dt', title: s.tip ? 'DT (' + s.tip + ')' : 'DT' }, s.v);
+        else stats.push(s);
+      });
+    }
+
+    const sc = stats.find((s) => /^score$/i.test(s.k)) || null;
+    const shown = stats.filter((s) => s !== sc);
+    const rows = Math.max(1, Math.ceil((shown.length + (sbBadge ? 1 : 0)) / 2));
+    const kOf = (s) => String(s.k).toLowerCase();
+    const WIDE_K = ['earned merit 120d', 'trust'];
+    const NARROW_K = ['posts', 'merit', 'activity', 'rank'];
+    const rankIn = (list, s) => { const i = list.indexOf(kOf(s)); return i < 0 ? 99 : i; };
+    const narrowList = shown.filter((s) => !WIDE_K.includes(kOf(s))).sort((a, b) => rankIn(NARROW_K, a) - rankIn(NARROW_K, b));
+    const wideList = shown.filter((s) => WIDE_K.includes(kOf(s))).sort((a, b) => rankIn(WIDE_K, a) - rankIn(WIDE_K, b));
+    const deskOrder = narrowList.concat(wideList);
+    const lastNarrow = narrowList.length % 2 ? narrowList[narrowList.length - 1] : null;
+    const scoreLine = sc
+      ? h('div', { class: 'btx-pi-score', title: 'Nutildah Postflayer Score', 'data-full': 'Nutildah Postflayer Score', onclick: toggleStatTip },
+        h('em', {}, 'Score: '), statVal(sc))
+      : null;
+
     return h('div', { class: 'btx-pi' + (av.length ? '' : ' noav') },
       av.length > 0 && h('div', { class: 'btx-pi-av' }, av),
       h('div', { class: 'btx-pi-id' },
-        h('div', { class: 'btx-pi-name' }, nameEl.cloneNode(true), op && h('span', { class: 'btx-op' }, 'OP'),
-          status.length > 0 && h('span', { class: 'btx-st' }, status)),
+        h('div', { class: 'btx-pi-name' }, nameEl.cloneNode(true), op && h('span', { class: 'btx-op' }, 'OP'), dtBadge,
+          status.length > 0 && h('span', { class: 'btx-st' }, status), sbBadge),
         rank && h('div', { class: 'btx-pi-rank' }, rank),
         stars.length > 0 && h('div', { class: 'btx-pi-stars' }, stars),
-        stats.length > 0 && h('div', { class: 'btx-pi-stats' + (stats.length > 5 ? ' many' : '') },
-          stats.map((s) => h('span', { class: 'btx-pi-stat' + (prefs.pabbr ? ' ab' : ''), title: s.k, 'data-full': s.k, onclick: prefs.pabbr ? toggleStatTip : null },
-            h('em', {}, h('span', { class: 'full' }, s.k), prefs.pabbr && h('span', { class: 'abv' }, statAbbr(s.k))), statVal(s))))
+        scoreLine,
+        (shown.length > 0 || sbBadge) && h('div', { class: 'btx-pi-stats' + (shown.length > 5 ? ' many' : ''), style: 'grid-template-rows:repeat(' + rows + ',auto)' },
+          shown.map((s) => {
+            const full = s.full || (s.tip ? s.k + ' (' + s.tip + ')' : s.k);
+            return h('span', {
+              class: 'btx-pi-stat' + (prefs.pabbr ? ' ab' : '') + (WIDE_K.includes(kOf(s)) || s === lastNarrow ? ' wide' : ''),
+              style: '--o:' + deskOrder.indexOf(s),
+              title: full, 'data-full': full, onclick: prefs.pabbr ? toggleStatTip : null
+            }, h('em', {}, h('span', { class: 'full' }, s.k), prefs.pabbr && h('span', { class: 'abv' }, statAbbr(s.k))), statVal(s));
+          }), sbBadge)
       ),
       extra.length > 0 && h('div', { class: 'btx-pi-extra' + (extra.length > 2 ? ' many' : '') }, extra),
       acts.length > 0 && h('div', { class: 'btx-pi-acts' }, acts)
@@ -4454,6 +5264,7 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
           const old = td.querySelector(':scope > .btx-pi');
           if (old) old.replaceWith(card); else td.prepend(card);
           td.classList.add('btx-rebuilt');
+            fitScores(card);
         }
       } catch (e) { td.classList.remove('btx-rebuilt'); }
       if (mo) mo.takeRecords();
@@ -4471,6 +5282,14 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
       requestAnimationFrame(draw);
     });
     mo.observe(td, { childList: true, subtree: true, characterData: true });
+
+    if (posterUid(td)) {
+      xLoad(posterUid(td), () => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(draw);
+      });
+    }
   }
 
   // Restyles every poster cell in the thread
@@ -4910,12 +5729,18 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
     const tile = (label, content, href, cls) => h(href ? 'a' : 'div', { class: 'btx-pf-tile' + (cls ? ' ' + cls : ''), href: href || null },
       h('small', {}, label), h('span', { class: 'val' }, content));
     const trust = d.fields.find((x) => x.key.toLowerCase() === 'trust');
+    const xt = profileExtraTiles(d, tile);
     const tiles = [
       d.posts && tile(L('pfPosts'), numOr(d.posts)),
-      d.activity && tile(L('pfActivity'), numOr(d.activity)),
       d.merit && tile(L('pfMerit'), numOr(d.merit), d.meritHref),
+      d.activity && tile(L('pfActivity'), numOr(d.activity)),
+      xt.rank,
+      xt.em,
+      xt.dt,
+      xt.score,
       trust && trust.text && tile(L('pfTrust'), nodeOf(trust), d.trustHref, 'trust')
     ].filter(Boolean);
+
 
     const hero = h('section', { class: 'btx-pf-hero' },
       d.avatar && h('div', { class: 'btx-pf-av' }, d.avatar.cloneNode(true)),
@@ -5001,6 +5826,7 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
       queued = true;
       requestAnimationFrame(redraw);
     });
+    if (prefs.bpip || prefs.pscore) xLoad(profileUid(d), redraw);
     mo.observe(d.table, { childList: true, subtree: true, characterData: true });
     return true;
   }
@@ -5542,6 +6368,7 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
         'background:var(--surface,#fff);color:var(--text,#000);border:1px solid var(--border,#ccc);border-radius:14px;',
         'box-shadow:0 8px 28px rgba(0,0,0,.28);overflow:hidden;font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}',
         '#btx-lp.wide{width:600px}',
+        '#btx-lp .wn{padding:8px 12px;background:#c0392b;color:#fff;font-weight:700;font-size:12.5px;line-height:1.35;overflow-wrap:anywhere}',
         '#btx-lp .im{display:block;width:100%;max-height:170px;object-fit:cover;background:var(--surface2,#eee)}',
         '#btx-lp .bd{padding:10px 12px;display:grid;gap:6px}',
         '#btx-lp .sr{display:flex;align-items:center;gap:6px;color:var(--muted,#666);font-size:12px;min-width:0}',
@@ -5633,6 +6460,32 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
     const httpUrl = (u) => {
       try { return /^https?:$/.test(new URL(u).protocol) ? u : ''; } catch (e) { return ''; }
     };
+
+// Teks link tampak seperti domain, tapi href menuju domain lain
+const linkMismatch = (a) => {
+  const m = (a.textContent || '').trim().match(/^(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,})(?:[\/?#:]|$)/i);
+  if (!m) return null;
+  const shown = m[1].toLowerCase().replace(/^www\./, '');
+  let real;
+  try { real = new URL(a.href).hostname.toLowerCase().replace(/^www\./, ''); } catch (e) { return null; }
+  return shown === real ? null : { shown, real };
+};
+
+// Banner peringatan di atas kartu (mismatch atau punycode)
+const wn = (a, d) => {
+  const id = LANG === 'id';
+  const msgs = [];
+  const mm = linkMismatch(a);
+  if (mm) msgs.push(id
+    ? 'Teks link menampilkan ' + mm.shown + ', tujuan sebenarnya ' + mm.real
+    : 'Link text shows ' + mm.shown + ', but it really goes to ' + mm.real);
+  let host = '';
+  try { host = new URL(a.href).hostname; } catch (e) {}
+  if ((d && d.warn === 'punycode') || /(^|\.)xn--/i.test(host)) msgs.push(id
+    ? 'Domain memakai karakter yang bisa menyerupai domain lain (punycode)'
+    : 'Domain uses look-alike characters (punycode)');
+  return msgs.length ? h('div', { class: 'wn', role: 'alert' }, msgs.map((x) => h('div', {}, '\u26A0 ' + x))) : null;
+};
 
     /* ---------- artikel / situs umum (lewat Worker) ---------- */
 
@@ -5736,7 +6589,7 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
         d.text ? h('div', { class: 'tx' }, d.text) : (d.desc && h('div', { class: 'ds' }, d.desc)),
         d.more && h('a', { class: 'mo', href: d.url, target: '_blank', rel: 'noopener' }, T.more),
         h('div', { class: 'ur' }, d.url));
-      c.replaceChildren(...[img, body].filter(Boolean));
+        c.replaceChildren(...[wn(a, d), img, body].filter(Boolean));
       place(a);
     };
 
@@ -5905,7 +6758,7 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
     const openThread = (a, info) => {
       const c = getCard();
       c.classList.add('wide');
-      c.replaceChildren(h('div', { class: 'ld' }, T.load));
+      c.replaceChildren(...[wn(a), h('div', { class: 'ld' }, T.load)].filter(Boolean));
       place(a);
       const x = new URL(a.href);
       const path = location.origin + x.pathname + x.search;
@@ -6255,7 +7108,7 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
           h('span', { class: 't' }, pmLabel(l.name)), icon('next'))))));
 
     const menuBtn = h('button', { type: 'button', class: 'btx-pm-menubtn', 'aria-expanded': 'false' },
-      h('span', { class: 'm' }, 'MENU'),
+      h('span', { class: 'm' }, 'PM MENU'),
       activeName && h('span', { class: 'c' }, activeName),
       icon('chev'));
 
@@ -6472,6 +7325,21 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
     return sec;
   }
 
+// Banner berita di dalam kartu welcome (isi diambil dari baris "News:" forum)
+function newsEl(head) {
+  if (!head.news) return null;
+  const src = head.news.cloneNode(true);
+  const first = src.querySelector('b');
+  if (first && /^news$/i.test(txt(first))) {
+    const n = first.nextSibling;
+    first.remove();
+    if (n && n.nodeType === 3) n.nodeValue = n.nodeValue.replace(/^\s*:\s*/, '');
+  }
+  return h('div', { class: 'btx-break', role: 'status' },
+    h('span', { class: 'btx-break-tag' }, h('i', { class: 'btx-break-dot' }), LANG === 'id' ? 'BERITA' : 'NEWS'),
+    h('div', { class: 'btx-break-txt' }, [...src.childNodes]));
+}
+
   // Builds the user hero card shown on every page
   function heroEl(head, compact) {
     const initial = (head.user || '?').charAt(0).toUpperCase();
@@ -6483,7 +7351,7 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
           h('p', { class: 'btx-sub' }, [head.date, head.logged && L('onlineTotal') + head.logged].filter(Boolean).join(' \u2022 '))
         )
       ),
-      quickRow(head, false)
+      newsEl(head)
     );
   }
 
@@ -6492,11 +7360,7 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
     const hero = heroEl(head, false);
 
     const children = [hero];
-    if (head.news) {
-      const news = h('div', { class: 'btx-news' });
-      head.news.childNodes.forEach((n) => news.append(n.cloneNode(true)));
-      children.push(news);
-    }
+
     const filter = filterField(L('filterBoards'));
     const fSearch = searchForm(head);
     fSearch.classList.add('btx-d-only');
@@ -6518,9 +7382,7 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
     setIdxPh();
     if (mqIdx && mqIdx.addEventListener) mqIdx.addEventListener('change', setIdxPh);
 
-    children.push(h('div', { class: 'btx-boardbar' },
-      navEl(head),
-      h('div', { class: 'btx-tools btx-tools-board' }, fSearch, fBitlist, mSearch, filter.el)));
+    const toolsEl = h('div', { class: 'btx-tools btx-tools-board' }, fSearch, fBitlist, mSearch, filter.el);
 
     const catWrap = h('div', { id: 'btx-cats' }, cats.map(categorySection));
     const empty = h('p', { class: 'btx-empty', hidden: true }, L('noBoard'));
@@ -6566,7 +7428,7 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
     }
 
     children.push(footer(head.markAll && h('div', {}, h('a', { class: 'btx-markall', href: head.markAll }, L('markAll')))));
-    return h('div', { id: 'btx-app' }, makeTopbar(sheet), h('main', { class: 'btx-wrap' }, children), sheet.overlay, sheet.others);
+    return h('div', { id: 'btx-app' }, stickyHead(head, sheet, toolsEl), h('main', { class: 'btx-wrap' }, children), sheet.overlay, sheet.others);
   }
 
   const ACT_LABEL = L('actMap');
@@ -6692,7 +7554,7 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
     const toolsEl = h('div', { class: 'btx-tools btx-tools-board' }, fSearch, fBitlist, mSearch, filter.el);
 
     // urutan: hero -> menu + pencarian -> breadcrumb -> kartu parent (judul + child boards)
-    const children = [heroEl(head, true), h('div', { class: 'btx-boardbar' }, navEl(head), toolsEl)];
+    const children = [heroEl(head, true)];
 
     if (bp.crumbs.length) {
       const crumbs = h('nav', { class: 'btx-crumbs', 'aria-label': L('breadcrumb') });
@@ -6766,15 +7628,14 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
     });
 
     children.push(buildPager(bp.pager), footer(null));
-    return h('div', { id: 'btx-app' }, makeTopbar(sheet), h('main', { class: 'btx-wrap' }, children), sheet.overlay, sheet.others);
+    return h('div', { id: 'btx-app' }, stickyHead(head, sheet, toolsEl), h('main', { class: 'btx-wrap' }, children), sheet.overlay, sheet.others);
   }
 
   // Builds the modern shell used above the original content of other pages
   function buildShell(head, sheet) {
-    return h('div', { id: 'btx-app' }, makeTopbar(sheet),
-      h('div', { class: 'btx-wrap btx-shellwrap' }, heroEl(head, true),
-        h('div', { class: 'btx-shellbar' }, navEl(head),
-          h('div', { class: 'btx-shellsearch' }, searchBox(head)))),
+    const tools = h('div', { class: 'btx-tools' }, searchBox(head));
+    return h('div', { id: 'btx-app' }, stickyHead(head, sheet, tools),
+      h('div', { class: 'btx-wrap btx-shellwrap' }, heroEl(head, true)),
       sheet.overlay, sheet.others);
   }
 
@@ -6793,6 +7654,265 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
     return 'legacy';
   }
 
+// Menyimpan tinggi header sticky ke variabel CSS supaya sidebar tidak tertutup
+function trackStickyHeight() {
+  const el = document.querySelector('.btx-sticky');
+  if (!el) return;
+  const set = () => {
+    document.documentElement.style.setProperty('--btx-stkH', Math.ceil(el.getBoundingClientRect().height) + 'px');
+  };
+  set();
+  window.addEventListener('resize', set);
+  window.addEventListener('load', set);
+  if (window.ResizeObserver) new ResizeObserver(set).observe(el);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(set);
+}
+
+// Sidebar sticky: kartu bisa dibuka/tutup; kalau total tinggi melebihi layar, kartu lain menutup otomatis
+function setupSideAccordion() {
+  const mq = window.matchMedia('(min-width:900px)');
+  document.querySelectorAll('.btx-pp-side').forEach((side) => {
+    if (side.dataset.btxAcc) return;
+    const cards = [...side.querySelectorAll('.btx-pf-card')].filter((c) => c.querySelector(':scope > .btx-pf-h'));
+    if (cards.length < 2) return;
+    side.dataset.btxAcc = '1';
+    side.classList.add('btx-acc');
+
+    let pinned = cards.find((c) => c.querySelector('.btx-pf-link.on')) || cards[0];
+    const room = () => {
+      const stk = parseFloat(document.documentElement.style.getPropertyValue('--btx-stkH')) || 72;
+      return window.innerHeight - stk - 28;
+    };
+    const overflow = () => side.getBoundingClientRect().height > room();
+    const sync = () => cards.forEach((c) => {
+      const hd = c.querySelector(':scope > .btx-pf-h');
+      hd.setAttribute('aria-expanded', String(!c.classList.contains('btx-cl')));
+    });
+    const fit = () => {
+      cards.forEach((c) => c.classList.remove('btx-cl'));
+      if (mq.matches && overflow()) cards.forEach((c) => { if (c !== pinned) c.classList.add('btx-cl'); });
+      sync();
+    };
+
+    cards.forEach((c) => {
+      const hd = c.querySelector(':scope > .btx-pf-h');
+      hd.setAttribute('role', 'button');
+      hd.setAttribute('tabindex', '0');
+      const toggle = () => {
+        if (!mq.matches) return;
+        if (c.classList.contains('btx-cl')) {
+          c.classList.remove('btx-cl');
+          pinned = c;
+          if (overflow()) cards.forEach((o) => { if (o !== c) o.classList.add('btx-cl'); });
+        } else {
+          c.classList.add('btx-cl');
+        }
+        sync();
+      };
+      hd.addEventListener('click', toggle);
+      hd.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+      });
+    });
+
+    fit();
+    let t = null;
+    const later = () => { clearTimeout(t); t = setTimeout(fit, 150); };
+    window.addEventListener('resize', later);
+    window.addEventListener('load', later);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(later);
+    setTimeout(fit, 600);
+  });
+}
+
+// Menyimpan tinggi top bar ke variabel CSS supaya bar MENU menempel tepat di bawahnya (mobile)
+function trackTopHeight() {
+  const el = document.querySelector('.btx-top');
+  if (!el || !document.body) return;
+  const set = () => document.body.style.setProperty('--btx-topH', Math.ceil(el.getBoundingClientRect().height) + 'px');
+  set();
+  window.addEventListener('resize', set);
+  window.addEventListener('load', set);
+  if (window.ResizeObserver) new ResizeObserver(set).observe(el);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(set);
+}
+
+  // Floating button: panah bawah di bagian atas halaman, panah atas di bagian bawah halaman
+  function setupScrollFab() {
+    if (document.getElementById('btx-fab')) return;
+    const id = LANG === 'id';
+    if (!document.getElementById('btx-fab-style')) {
+      const st = document.createElement('style');
+      st.id = 'btx-fab-style';
+      st.textContent = [
+        '#btx-fab{position:fixed;z-index:40;right:max(14px,env(safe-area-inset-right));',
+        'bottom:max(16px,env(safe-area-inset-bottom));width:44px;height:44px;border-radius:50%;padding:0;',
+        'display:none;align-items:center;justify-content:center;cursor:pointer;',
+        'color:var(--on-accent,#fff);background:var(--accent,#476C8E);border:0;',
+        'box-shadow:0 4px 14px rgba(0,0,0,.3);transition:transform .15s,filter .15s,opacity .2s;opacity:.92}',
+        '#btx-fab.show{display:flex}',
+        '#btx-fab:hover{filter:brightness(1.1);opacity:1}',
+        '#btx-fab:active{transform:scale(.93)}',
+        '#btx-fab svg{display:block;transition:transform .2s}',
+        '#btx-fab.down svg{transform:rotate(180deg)}',
+        '@media(max-width:759px){#btx-fab{width:40px;height:40px;opacity:.85}}'
+      ].join('');
+      document.head.append(st);
+    }
+
+    const btn = h('button', { id: 'btx-fab', type: 'button' });
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>';
+    document.body.append(btn);
+
+    const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches);
+    let goDown = false, ticking = false;
+
+    const update = () => {
+      ticking = false;
+      const de = document.documentElement;
+      const max = Math.max(de.scrollHeight, document.body.scrollHeight) - window.innerHeight;
+      if (max < 300) { btn.classList.remove('show'); return; }
+      const y = window.pageYOffset || de.scrollTop || 0;
+      goDown = y / max < 0.5;
+      btn.classList.add('show');
+      btn.classList.toggle('down', goDown);
+      const label = goDown ? (id ? 'Ke bawah halaman' : 'Go to bottom') : (id ? 'Ke atas halaman' : 'Go to top');
+      btn.title = label;
+      btn.setAttribute('aria-label', label);
+    };
+    const queue = () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } };
+
+    btn.addEventListener('click', () => {
+      const de = document.documentElement;
+      const top = goDown ? Math.max(de.scrollHeight, document.body.scrollHeight) : 0;
+      window.scrollTo({ top, behavior: reduce ? 'auto' : 'smooth' });
+    });
+
+    window.addEventListener('scroll', queue, { passive: true });
+    window.addEventListener('resize', queue);
+    window.addEventListener('load', queue);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(queue);
+    [500, 1500, 3500].forEach((ms) => setTimeout(queue, ms));
+    update();
+  }
+
+  // Mode template asli: sisipkan stat tambahan di bawah info poster bawaan
+  function origPosterStats() {
+    document.querySelectorAll('#bodyarea td.poster_info, #bodyarea td[width="16%"][rowspan="2"]').forEach((td) => {
+      if (td.dataset.btxOs) return;
+      td.dataset.btxOs = '1';
+      const uid = posterUid(td);
+      if (!uid) return;
+      const box = h('div', { class: 'btx-os' });
+      const info = [...td.querySelectorAll('div.smalltext')][0];
+      if (!info) return;
+      info.after(box);
+      const draw = () => {
+        const ex = xGet(uid);
+        const chips = [];
+        if (ex) {
+          xExtraStats(ex, true).forEach((s) => {
+            chips.push(h('div', { class: 'btx-os-i', title: s.full || s.tip || s.k },
+              h('span', {}, s.k === 'Earned Merit 120D' ? 'EM120D' : s.k), ': ',
+              h('b', { style: s.color ? 'color:' + s.color : null }, s.k === 'Rank' ? supOrd(s.v) : s.v)));
+          });
+          const sb = sigBanInfo(td);
+          if (sb) chips.push(h('div', { class: 'btx-os-i btx-os-ban', title: sb }, '\uD83D\uDEAB Sig ban'));
+        }
+        box.replaceChildren(...chips);
+      };
+      draw();
+      xLoad(uid, draw);
+    });
+  }
+
+  // Mode template asli: tombol Settings di kotak header bawaan (kanan atas)
+  function setupOrigSettings() {
+    const td = document.getElementById('variousheadlinks');
+    if (!td || document.getElementById('btx-os-btn')) return;
+    const id = LANG === 'id';
+    const rows = [
+      ['origtpl', id ? 'Template asli forum (mati = tampilan modern)' : 'Original forum template (off = modern UI)', true, 'p'],
+      ['bpip', 'BPIP Stat (Earned Merit, DT, Rank)', true, 'p'],
+      ['pscore', 'Nutildah Postflayer Score', true, 'p'],
+      ['sigban', 'Sigban Info', true, 'p'],
+      ['wshort', L('wsToggle'), false, 'p'],
+      ['linkprev', id ? 'Preview link saat hover' : 'Link preview on hover', true, 's']
+    ];
+    const getV = (k, kind) => (kind === 's' ? store.get(k, true) : !!prefs[k]);
+
+    const close = () => overlay.classList.remove('open');
+    const list = rows.map(([k, label, reload, kind]) => {
+      const b = h('button', { type: 'button', class: getV(k, kind) ? 'on' : '', role: 'switch', 'aria-label': label });
+      b.setAttribute('aria-checked', String(getV(k, kind)));
+      b.addEventListener('click', () => {
+        const nv = !getV(k, kind);
+        if (kind === 's') store.set(k, nv); else { prefs[k] = nv; store.set(k, nv); }
+        b.classList.toggle('on', nv);
+        b.setAttribute('aria-checked', String(nv));
+        if (reload) location.reload();
+      });
+      return h('div', { class: 'btx-osr' }, h('span', {}, label), b);
+    });
+
+    const overlay = h('div', { class: 'btx-osov', role: 'dialog', 'aria-modal': 'true' },
+      h('div', { class: 'btx-osbox' },
+        h('div', { class: 'btx-osh' }, h('b', {}, id ? 'Pengaturan' : 'Settings'),
+          h('button', { type: 'button', class: 'btx-osx', 'aria-label': L('close'), onclick: close }, '\u00D7')),
+        list));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+
+    const btn = h('button', { type: 'button', id: 'btx-os-btn', class: 'btx-osbtn', onclick: () => overlay.classList.add('open') },
+      '\u2699 ' + (id ? 'Pengaturan' : 'Settings'));
+    td.style.position = 'relative';
+    td.prepend(btn);
+    document.body.append(overlay);
+  }
+
+  // CSS ringan untuk mode "template asli": hanya untuk fitur tambahan
+  const ORIG_CSS = `
+:root{--surface:#F6F6F6;--surface2:#ECEDF3;--text:#000;--muted:#666;--border:#ADADAD;
+  --accent:#476C8E;--on-accent:#fff;--link:#476C8E;--quote-bg:#f1f2f4;--quote-border:#d0d0e0}
+body.btx-orig .btx-tki{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;margin:4px 0;vertical-align:middle}
+body.btx-orig .btx-tki button{display:inline-flex;align-items:center;height:26px;padding:0 12px;box-sizing:border-box;
+  border-radius:8px;font:inherit;font-size:12px;font-weight:700;line-height:1;cursor:pointer;
+  color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--accent) 45%,transparent)}
+body.btx-orig .btx-tki button:hover{background:var(--accent);color:var(--on-accent);border-color:transparent}
+body.btx-orig .btx-tki button.btx-wst.off{color:var(--muted);background:var(--surface2);border-color:var(--border)}
+body.btx-orig .btx-tki-msg{font-size:12px;color:var(--muted)}
+body.btx-orig .btx-tki-msg.ok{color:#15803d}
+body.btx-orig .codeheader.btx-hascopy{display:flex;align-items:center;gap:8px}
+body.btx-orig .btx-copy{margin-left:auto;height:22px;padding:0 10px;border-radius:999px;font:inherit;font-size:11px;font-weight:600;
+  cursor:pointer;color:var(--accent);background:var(--surface);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent)}
+body.btx-orig .btx-copy:hover,body.btx-orig .btx-copy.ok{background:var(--accent);color:var(--on-accent);border-color:transparent}
+body.btx-orig .btx-os{margin-top:4px;font-size:11px;line-height:1.5}
+body.btx-orig .btx-os-i{white-space:normal;overflow-wrap:anywhere}
+body.btx-orig .btx-os-i b{font-weight:700}
+body.btx-orig .btx-os-ban{color:#dc2626;font-weight:700}
+
+body.btx-orig .btx-osbtn{position:absolute;top:6px;right:8px;height:26px;padding:0 12px;border-radius:8px;
+  font:inherit;font-size:12px;font-weight:700;cursor:pointer;color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 12%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--accent) 45%,transparent)}
+body.btx-orig .btx-osbtn:hover{background:var(--accent);color:var(--on-accent);border-color:transparent}
+body.btx-orig .btx-osov{position:fixed;inset:0;z-index:2147483000;display:none;align-items:center;justify-content:center;
+  padding:12px;box-sizing:border-box;background:rgba(10,10,25,.45)}
+body.btx-orig .btx-osov.open{display:flex}
+body.btx-orig .btx-osbox{width:100%;max-width:440px;max-height:calc(100vh - 24px);overflow:auto;box-sizing:border-box;
+  padding:14px 16px;border-radius:16px;background:var(--surface);color:var(--text);border:1px solid var(--border);
+  box-shadow:0 10px 40px rgba(0,0,0,.3);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+body.btx-orig .btx-osh{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:16px}
+body.btx-orig .btx-osx{width:30px;height:30px;border:0;border-radius:8px;background:transparent;color:var(--muted);font-size:22px;cursor:pointer}
+body.btx-orig .btx-osr{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-top:1px solid var(--border)}
+body.btx-orig .btx-osr button{width:46px;height:26px;border-radius:999px;border:0;background:var(--surface2);position:relative;flex:none;cursor:pointer}
+body.btx-orig .btx-osr button::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .15s}
+body.btx-orig .btx-osr button.on{background:var(--accent)}
+body.btx-orig .btx-osr button.on::after{transform:translateX(20px)}
+
+`;
+
   // Builds the modern UI for the current page
   function init() {
     if (document.getElementById('btx-app') || !document.getElementById('bodyarea')) return;
@@ -6810,6 +7930,19 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
     }
     if (!document.querySelector('meta[name="theme-color"]')) {
       document.head.append(h('meta', { name: 'theme-color', content: '#E5E5E8' }));
+    }
+if (prefs.origtpl) {
+      document.head.append(h('style', { id: 'btx-style' }, ORIG_CSS));
+      document.body.classList.add('btx-orig');
+      safe(setupCodeCopy);
+      safe(setupTalkImg);
+      safe(setupLinkPreview);
+      safe(setupWritingShortcuts);
+      safe(setupScrollFab);
+      safe(origPosterStats);
+          safe(setupOrigSettings);
+      applyPrefs();
+      return;
     }
     document.head.append(h('style', { id: 'btx-style' }, CSS));
     document.body.classList.add('btx');
@@ -6853,6 +7986,12 @@ body.btx-legacy #bodyarea .btx-gone .btx-btn{
 
     applyPrefs();
     safe(centerPagers);
+    safe(trackStickyHeight);
+    safe(trackTopHeight);
+    safe(setupSideAccordion);
+    safe(setupScoreFit);
+    safe(setupScrollFab);
+
   }
 
   // Menjaga ukuran gambar sesuai atribut width/height buatan pembuat post (di post maupun di dalam quote)
