@@ -15,7 +15,10 @@
 // @connect      bitlist.co
 // @connect      bpip.org
 // @connect      www.bpip.org
+// @connect      brdb.cc
+// @connect      www.brdb.cc
 // @connect      postflayer.onrender.com
+// @match        https://postflayer.onrender.com/*
 // @connect      lp.gatauwis.workers.dev
 // @connect      update.greasyfork.org
 // @license      Public/Free
@@ -138,6 +141,21 @@
       if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
       else start();
     })();
+    return;
+  }
+
+  // Postflayer page: auto-fill user ID from link (#uid=123) and run the lookup
+  if (/(^|\.)postflayer\.onrender\.com$/i.test(location.hostname)) {
+    const run = () => {
+      const m = location.hash.match(/uid=(\d+)/);
+      const input = document.getElementById('uid');
+      if (!m || !input) return;
+      input.value = m[1];
+      const btn = [...document.querySelectorAll('button')].find((b) => /lookup/i.test(b.textContent));
+      if (btn) btn.click();
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+    else run();
     return;
   }
 
@@ -3933,6 +3951,69 @@ body.btx-compact .btx-break{margin-top:8px;padding:5px 10px}
   body.btx-compact .btx-mnav-bar{height:36px}
 }
 
+/* ==== BRDb: bendera bulat + rank di kanan + chip skor ==== */
+body.btx-legacy #bodyarea .btx-pi-rr{
+  display:flex;align-items:center;justify-content:center;gap:10px;min-width:0;max-width:100%;font-size:12px}
+body.btx-legacy #bodyarea .btx-pi-rc{
+  display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}
+body.btx-legacy #bodyarea .btx-pi-rr.hasflag .btx-pi-rc{align-items:flex-start;text-align:left}
+body.btx-legacy #bodyarea .btx-flag{
+  flex:none;display:block;width:2.5em;height:2.5em;margin:0;border-radius:50%;
+  background-color:var(--surface2);background-size:cover;background-position:center;background-repeat:no-repeat;
+  box-shadow:0 0 0 2px var(--accent),0 2px 6px rgba(0,0,0,.18)}
+body.btx-legacy #bodyarea .btx-pi-scores{display:grid;gap:3px;min-width:0;width:100%;box-sizing:border-box}
+@media(max-width:759px){
+  body.btx-legacy #bodyarea .btx-pi-rr{
+    grid-area:rank-start / rank-start / stars-end / stars-end;
+    justify-content:flex-start;gap:8px;font-size:11px}
+  body.btx-legacy #bodyarea .btx-pi-rr .btx-pi-rc{align-items:flex-start;text-align:left}
+  body.btx-legacy #bodyarea .btx-pi-scores{grid-area:score;align-self:start;margin-top:4px}
+  body.btx-legacy #bodyarea .btx-pi-scores .btx-pi-score{margin-top:0}
+}
+
+/* ==== Link ke sumber asli ==== */
+body.btx-legacy #bodyarea a.btx-lnk{text-decoration:none;cursor:pointer}
+body.btx-legacy #bodyarea a.btx-pi-score.btx-lnk{color:var(--text)}
+body.btx-legacy #bodyarea a.btx-pi-stat.btx-lnk{color:inherit}
+body.btx-legacy #bodyarea a.btx-flag.btx-lnk{display:block}
+@media(hover:hover){
+  body.btx-legacy #bodyarea a.btx-pi-score.btx-lnk:hover,
+  body.btx-legacy #bodyarea a.btx-pi-stat.btx-lnk:hover{
+    background:color-mix(in srgb,var(--accent) 16%,var(--surface));
+    border-color:var(--accent)}
+  body.btx-legacy #bodyarea a.btx-flag.btx-lnk:hover{filter:brightness(1.12)}
+}
+
+/* ==== Bendera: tinggi mengikuti blok rank + koin (CSS murni) ==== */
+body.btx-legacy #bodyarea .btx-pi-rr{align-items:stretch}
+
+/* blok teks + koin: isi dipusatkan vertikal, tanpa celah baseline */
+body.btx-legacy #bodyarea .btx-pi-rc{justify-content:center}
+body.btx-legacy #bodyarea .btx-pi-rank{line-height:1.2}
+body.btx-legacy #bodyarea .btx-pi-stars{display:flex;line-height:0}
+body.btx-legacy #bodyarea .btx-pi-stars img{display:block;flex:none}
+
+/* ring aksen digambar ke dalam, jadi tidak menambah ukuran */
+body.btx-legacy #bodyarea .btx-flag{
+  box-shadow:inset 0 0 0 2px var(--accent),0 2px 6px rgba(0,0,0,.18)}
+
+/* bendera mengikuti tinggi kotak, tetap bulat */
+@supports (aspect-ratio:1 / 1){
+  body.btx-legacy #bodyarea .btx-flag{
+    width:auto;height:auto;aspect-ratio:1 / 1;
+    align-self:stretch;flex:none;margin:0}
+}
+
+/* ==== Bendera: ikut tinggi blok rank + koin ==== */
+body.btx-legacy #bodyarea .btx-pi-rr{align-items:center}
+body.btx-legacy #bodyarea .btx-pi-rc{justify-content:center}
+body.btx-legacy #bodyarea .btx-pi-rank{line-height:1.2}
+body.btx-legacy #bodyarea .btx-pi-stars{display:flex;line-height:0}
+body.btx-legacy #bodyarea .btx-pi-stars img{display:block;flex:none}
+body.btx-legacy #bodyarea .btx-flag{
+  flex:none;box-sizing:border-box;
+  box-shadow:inset 0 0 0 2px var(--accent),0 2px 6px rgba(0,0,0,.18)}
+
 /* ==== Score: selalu satu baris ==== */
 body.btx-legacy #bodyarea .btx-pi-score{
   display:block;white-space:nowrap;overflow:hidden;text-overflow:clip;text-align:center}
@@ -3941,7 +4022,7 @@ body.btx-legacy #bodyarea .btx-pi-score{
 
   const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
   const prefs = {
-    origtpl: store.get('origtpl', true),
+    origtpl: store.get('origtpl', false),
     theme: store.get('theme', 'auto'),
     accent: store.get('accent', 'bitcointalk'),
     compact: store.get('compact', false),
@@ -3956,6 +4037,7 @@ body.btx-legacy #bodyarea .btx-pi-score{
     bitlist: store.get('bitlist', true),
     bpip: store.get('bpip', true),
     pscore: store.get('pscore', true),
+    brdb: store.get('brdb', true),
     sigban: store.get('sigban', true),
     wshort: store.get('wshort', true),
     blinline: store.get('blinline', true),
@@ -4310,6 +4392,7 @@ body.btx-legacy #bodyarea .btx-pi-score{
     const statS = sheetOf('btx-stat', LANG === 'id' ? 'Info statistik' : 'Stat info', [
       h('div', { class: 'btx-row' }, toggle('BPIP Stat (Earned Merit, DT, Recognition Rank)', 'bpip', true)),
       h('div', { class: 'btx-row' }, toggle('Nutildah Postflayer Score', 'pscore', true)),
+      h('div', { class: 'btx-row' }, toggle('BRDb Flag & Score', 'brdb', true)),
       h('div', { class: 'btx-row' }, toggle('Sigban Info', 'sigban', true)),
       h('p', { class: 'btx-sub' }, LANG === 'id' ? 'Halaman dimuat ulang setelah saklar diubah.' : 'The page reloads after a switch is changed.')
     ]);
@@ -4690,9 +4773,29 @@ function navEl(head) {
   const X_TTL = 6 * 60 * 60 * 1000;
   const X_MAX = 400;
   const xCache = (() => { const v = store.get('xstat', {}); return v && typeof v === 'object' ? v : {}; })();
+    if (store.get('xver', 0) < 2) { Object.keys(xCache).forEach((k) => delete xCache[k]); store.set('xver', 2); store.set('xstat', {}); }
   const xPending = {};
   const xFail = {};
-  const xChain = { forum: Promise.resolve(), bpip: Promise.resolve(), score: Promise.resolve() };
+const xLimit = { forum: 2, bpip: 3, score: 3, brdb: 3, wk: 4 }; // jumlah permintaan bersamaan per sumber
+const xSlots = { forum: 0, bpip: 0, score: 0, brdb: 0, wk: 0 };
+const xQueue = { forum: [], bpip: [], score: [], brdb: [], wk: [] };
+
+// Runs a job on a named queue (several at once, with a pause after each)
+function xRun(name, gap, fn) {
+  return new Promise((resolve, reject) => {
+    xQueue[name].push({ fn, resolve, reject });
+    xPump(name, gap);
+  });
+}
+function xPump(name, gap) {
+  while (xSlots[name] < xLimit[name] && xQueue[name].length) {
+    const job = xQueue[name].shift();
+    xSlots[name]++;
+    Promise.resolve().then(job.fn).then(job.resolve, job.reject).finally(() => {
+      setTimeout(() => { xSlots[name]--; xPump(name, gap); }, gap);
+    });
+  }
+}
   let xSaveTimer = null;
 
   // Builds the short label of a stat: fixed labels for extra stats, initials for the others
@@ -4722,12 +4825,6 @@ function navEl(head) {
     }, 800);
   }
 
-  // Runs a job on a named queue with a pause after each job
-  function xRun(name, gap, fn) {
-    const job = xChain[name].then(fn);
-    xChain[name] = job.catch(() => {}).then(() => new Promise((r) => setTimeout(r, gap)));
-    return job;
-  }
 
   // Fetches the merit summary of a user and sums the merit received in the last 120 days
   function xMerit(uid) {
@@ -4816,6 +4913,54 @@ function navEl(head) {
     }));
   }
 
+  // BRDb: local board id -> [kode bendera flagcdn, nama board]
+  const BRDB_BOARDS = {
+    '10': ['ru', 'Русский (Russian)'], '13': ['fr', 'Français'], '16': ['de', 'Deutsch (German)'],
+    '27': ['es', 'Español (Spanish)'], '28': ['it', 'Italiano (Italian)'], '29': ['pt', 'Português (Portuguese)'],
+    '30': ['cn', '中文 (Chinese)'], '79': ['nl', 'Nederlands (Dutch)'], '82': ['kr', '한국어 (Korean)'],
+    '89': ['in', 'India'], '95': ['il', 'עברית (Hebrew)'], '108': ['ro', 'Română (Romanian)'],
+    '120': ['gr', 'Ελληνικά (Greek)'], '133': ['tr', 'Türkçe (Turkish)'], '142': ['pl', 'Polski'],
+    '191': ['id', 'Bahasa Indonesia (Indonesian)'], '201': ['hr', 'Hrvatski (Croatian)'],
+    '219': ['ph', 'Pilipinas'], '241': ['sa', 'العربية (Arabic)'], '252': ['jp', '日本語 (Japanese)'],
+    '275': ['ng', 'Nigeria (Naija)']
+  };
+
+  // Fetches flag (from local board) and BRDb score through the BRDb JSON API
+  function xBrdb(uid) {
+    const getJson = (path) => new Promise((resolve, reject) => {
+      if (typeof GM_xmlhttpRequest !== 'function') return reject(new Error('no GM_xmlhttpRequest'));
+      GM_xmlhttpRequest({
+        method: 'GET',
+        url: 'https://brdb.cc' + path,
+        timeout: 20000,
+        anonymous: true,
+        headers: { Accept: 'application/json' },
+        onload: (r) => {
+          if (r.status < 200 || r.status >= 300) return reject(new Error('HTTP ' + r.status));
+          try { resolve(JSON.parse(r.responseText || '{}')); } catch (e) { reject(e); }
+        },
+        onerror: () => reject(new Error('network')),
+        ontimeout: () => reject(new Error('timeout'))
+      });
+    });
+    return xRun('brdb', 400, async () => {
+      const [u, s] = await Promise.all([
+        getJson('/api/user/' + uid).catch(() => null),
+        getJson('/api/brdb-score/' + uid).catch(() => null)
+      ]);
+      let score = '';
+      if (s && typeof s.score === 'number' && s.score > 0) score = s.score.toFixed(1);
+      let iso = '', tip = '';
+      const lb = u && u.found && u.data ? BRDB_BOARDS[String(u.data.local_board)] : null;
+      if (lb) { iso = lb[0]; tip = lb[1]; }
+      if (!score && !iso) {
+        if (window.console) console.warn('[btx] BRDb: tidak ada data', uid, u && u.found, s);
+        throw new Error('no data');
+      }
+      return { score, iso, tip };
+    });
+  }
+
   // Shortens a rank like "1234th" to "1.2K" when it is 1000 or more
   function xRank(raw) {
     const m = String(raw || '').match(/\d[\d.,]*/);
@@ -4850,45 +4995,147 @@ function navEl(head) {
     return { v, color };
   }
 
-  // Loads extra stats of a user once and calls back when new data arrived
-  function xLoad(uid, done) {
+// Mengambil data poster dari Worker secara batch: permintaan yang datang
+// dalam jeda singkat dikumpulkan lalu dikirim sebagai satu request
+const WK_URL = 'https://ah.manukkudicekeli.workers.dev/';
+const WK_PARAM = 'uids';
+const WK_MAX = 20;
+const WK_WAIT = 60;
+let wkBuf = new Map();
+let wkTimer = null;
+
+// Mengirim satu request batch ke Worker dan mengembalikan JSON-nya
+function wkRequest(ids) {
+    return xRun('wk', 100, () => new Promise((resolve, reject) => {
+      if (typeof GM_xmlhttpRequest !== 'function') return reject(new Error('no GM_xmlhttpRequest'));
+      GM_xmlhttpRequest({
+        method: 'GET',
+        url: WK_URL + '?' + WK_PARAM + '=' + ids.map(encodeURIComponent).join(','),
+        timeout: 45000,
+        anonymous: true,
+        headers: { Accept: 'application/json' },
+        onload: (r) => {
+          if (r.status < 200 || r.status >= 300) return reject(new Error('HTTP ' + r.status));
+          try { resolve(JSON.parse(r.responseText || '{}')); } catch (e) { reject(e); }
+        },
+        onerror: () => reject(new Error('network')),
+        ontimeout: () => reject(new Error('timeout'))
+      });
+    }));
+}
+
+// Mengosongkan kumpulan: dibagi per WK_MAX user, tiap bagian jadi satu request
+function wkFlush() {
+    wkTimer = null;
+    const entries = [...wkBuf.entries()];
+    wkBuf = new Map();
+    for (let i = 0; i < entries.length; i += WK_MAX) {
+      const chunk = entries.slice(i, i + WK_MAX);
+      wkRequest(chunk.map((e) => e[0])).then((data) => {
+        chunk.forEach(([uid, waiters]) => {
+          // jawaban normal: { "uid": {...} }; jaga-jaga kalau 1 user dijawab tanpa pembungkus
+          const w = data && (data[uid] || (String(data.uid) === uid ? data : null));
+          waiters.forEach((p) => (w ? p.resolve(w) : p.reject(new Error('no data'))));
+        });
+      }, (err) => {
+        chunk.forEach(([uid, waiters]) => waiters.forEach((p) => p.reject(err)));
+      });
+    }
+}
+
+// Dipanggil oleh xLoad untuk satu user; hasilnya datang dari batch
+function xWorker(uid) {
+    return new Promise((resolve, reject) => {
+      const key = String(uid);
+      if (!wkBuf.has(key)) wkBuf.set(key, []);
+      wkBuf.get(key).push({ resolve, reject });
+      if (!wkTimer) wkTimer = setTimeout(wkFlush, WK_WAIT);
+    });
+}
+
+function xLoad(uid, done) {
     if (!uid) return;
     const hit = xCache[uid];
     const fresh = !!hit && Date.now() - hit.t < X_TTL;
-    const needB = prefs.bpip && !(fresh && hit.em !== undefined);
+    const needB = prefs.bpip && !(fresh && hit.em !== undefined && hit.dt !== undefined);
     const needS = prefs.pscore && !(fresh && hit.sc !== undefined);
     const needX = prefs.sigban && !(fresh && hit.sb !== undefined);
-    if (xFail[uid] || (!needB && !needS && !needX)) return;
+    const needR = prefs.brdb && !(fresh && hit.bs !== undefined);
+    if (xFail[uid] && Date.now() - xFail[uid] < 60000) return;
+    if (!needB && !needS && !needX && !needR) {
+      // Data sudah lengkap di cache: tetap panggil done supaya kartu poster lain ikut digambar
+      if (hit && typeof done === 'function') setTimeout(() => safe(done), 0);
+      return;
+    }
     if (xPending[uid]) { xPending[uid].push(done); return; }
     xPending[uid] = [done];
     const rec = fresh ? Object.assign({}, hit) : { t: Date.now() };
     rec.t = Date.now();
-    const hasData = () => (rec.em !== null && rec.em !== undefined) || !!rec.dt || !!rec.sc || typeof rec.sb === 'string';
+    const hasData = () => (rec.em !== null && rec.em !== undefined) || !!rec.dt || !!rec.sc || !!rec.bs || !!rec.fl || typeof rec.sb === 'string';
     const push = () => {
       if (hasData()) xCache[uid] = rec;
       (xPending[uid] || []).slice().forEach((f) => safe(f));
     };
-    const jobs = [];
-    if (needX) {
-      jobs.push(xSigBan(uid).then((v) => { rec.sb = v; push(); }, () => {}));
-    }
-    if (needB) {
-      rec.em = null; rec.dt = null; rec.dtTip = ''; rec.rr = null;
-      jobs.push(
-        xMerit(uid).then((v) => { rec.em = v; push(); }, () => {}),
-        xBpip(uid).then((v) => { rec.dt = v.dt; rec.dtTip = v.dtTip; rec.rr = v.rr; push(); }, () => {})
-      );
-    }
-    if (needS) {
-      rec.sc = '';
-      jobs.push(xScore(uid).then((v) => { rec.sc = v; push(); }, () => {}));
-    }
-    Promise.all(jobs).then(() => {
+    const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // Cadangan: cara lama (satu per satu ke tiap sumber) kalau Worker gagal
+    const fallback = () => {
+      const jobs = [];
+      if (needX) jobs.push(xSigBan(uid).then((v) => { rec.sb = v; push(); }, () => {}));
+      if (needB) {
+        jobs.push(
+          xMerit(uid).then((v) => { rec.em = v; push(); }, () => {}),
+          xBpip(uid).then((v) => { rec.dt = v.dt; rec.dtTip = v.dtTip; rec.rr = v.rr; push(); }, () => {})
+        );
+      }
+      if (needS) jobs.push(xScore(uid).then((v) => { rec.sc = v; push(); }, () => {}));
+      if (needR) jobs.push(xBrdb(uid).then((v) => { rec.bs = v.score; rec.fl = v.iso; rec.ft = v.tip; push(); }, () => {}));
+      return Promise.all(jobs);
+    };
+
+    // Membaca JSON Worker lalu mengisi rec sesuai pengaturan yang aktif
+    const fromWorker = (w) => {
+      w = w || {};
+      const extra = [];
+      if (needX && w.sigban && typeof w.sigban.is_banned === 'boolean') {
+        let v = '';
+        if (w.sigban.is_banned && w.sigban.until) {
+          const m = String(w.sigban.until).match(/([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})/);
+          if (m) v = m[1] + '|' + m[2] + '|' + m[3];
+          else {
+            const d = new Date(w.sigban.until);
+            if (!isNaN(d.getTime())) v = MON[d.getUTCMonth()] + '|' + d.getUTCDate() + '|' + d.getUTCFullYear();
+          }
+        }
+        rec.sb = v;
+      }
+      if (needB && w.bpip && typeof w.bpip === 'object') {
+        rec.dt = w.bpip.dt || 'Non-DT';
+        rec.dtTip = w.bpip.dt_tip || '';
+        rec.rr = w.bpip.rank || null;
+        if (typeof w.bpip.em === 'number') rec.em = w.bpip.em;
+      }
+      if (needB && rec.em === undefined) {
+        extra.push(xMerit(uid).then((v) => { rec.em = v; push(); }, () => {}));
+      }
+      if (needS && w.postflayer && typeof w.postflayer === 'object') {
+        rec.sc = w.postflayer.score ? String(w.postflayer.score) : '';
+      }
+      if (needR && w.brdb && typeof w.brdb === 'object') {
+        rec.bs = w.brdb.score ? String(w.brdb.score) : '';
+        rec.fl = w.brdb.flag_iso || '';
+        rec.ft = w.brdb.flag_tip || '';
+      }
+      push();
+      return Promise.all(extra);
+    };
+
+    xWorker(uid).then(fromWorker).catch(() => fallback()).then(() => {
       if (hasData()) xSave();
-      else xFail[uid] = true;
+      else xFail[uid] = Date.now();
       delete xPending[uid];
     });
-  }
+}
 
   // Turns a cached record into the list of extra stats in display order; on poster cards DT is shown only for DT members
   function xExtraStats(ex, forPoster) {
@@ -5048,9 +5295,62 @@ function fitScores(root) {
     }
 
     const abbreviated = b.textContent !== full;
-    const tip = 'Nutildah Postflayer Score' + (abbreviated ? ': ' + full : '');
+    const tipBase = el.classList.contains('btx-pi-brdb') ? 'BRDb Score' : 'Nutildah Postflayer Score';
+    const tip = tipBase + (abbreviated ? ': ' + full : '');
     el.title = tip;
     el.setAttribute('data-full', tip);
+  });
+}
+
+
+// Bendera bulat: atas = tepi atas huruf rank, bawah = tepi bawah koin
+const FLAG_PAD = 0; // jarak tambahan atas & bawah (px)
+let capCtx = null;
+
+// Jarak dari tepi atas kotak teks sampai atas huruf kapital (px)
+function capInset(el) {
+  const cs = getComputedStyle(el);
+  const fs = parseFloat(cs.fontSize) || 12;
+  let lh = parseFloat(cs.lineHeight);
+  if (!(lh > 0)) lh = fs * 1.2;
+  try {
+    capCtx = capCtx || document.createElement('canvas').getContext('2d');
+    capCtx.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + fs + 'px ' + cs.fontFamily;
+    const m = capCtx.measureText('H');
+    const fa = m.fontBoundingBoxAscent, fd = m.fontBoundingBoxDescent, ca = m.actualBoundingBoxAscent;
+    if (fa && ca) return Math.max(0, (lh - (fa + fd)) / 2 + fa - ca);
+  } catch (e) {}
+  return fs * 0.2;
+}
+
+function fitFlags(root) {
+  (root || document).querySelectorAll('.btx-flag').forEach((flag) => {
+    const rr = flag.parentElement;
+    const rc = rr && rr.querySelector('.btx-pi-rc');
+    if (!rc) return;
+    const rank = rc.querySelector('.btx-pi-rank');
+    const imgs = rc.querySelectorAll('.btx-pi-stars img');
+    const rcTop = rc.getBoundingClientRect().top;
+
+    const inkTop = rank ? rank.getBoundingClientRect().top - rcTop + capInset(rank) : 0;
+    const bottom = imgs.length
+      ? imgs[imgs.length - 1].getBoundingClientRect().bottom - rcTop
+      : rc.offsetHeight;
+
+    const d = Math.round(bottom - inkTop - FLAG_PAD * 2);
+    if (d >= 16) {
+      flag.style.width = d + 'px';
+      flag.style.height = d + 'px';
+      // tengah huruf+koin tidak sama dengan tengah kotak, jadi digeser
+      const shift = (inkTop + bottom) / 2 - rc.offsetHeight / 2;
+      flag.style.transform = 'translateY(' + shift.toFixed(1) + 'px)';
+    }
+
+    rc.querySelectorAll('img').forEach((img) => {
+      if (img.complete || img.dataset.btxF) return;
+      img.dataset.btxF = '1';
+      img.addEventListener('load', () => fitFlags(root));
+    });
   });
 }
 
@@ -5110,6 +5410,15 @@ function sigBanInfo(td) {
 
   return (langCheck ? 'Sigban sampai ' : 'Sigban until ') + two(mon) + '-' + two(p[1]) + '-' + p[2];
 }
+
+  // Link ke sumber asli + tracking sumber
+  const UTM = 'utm_source=btalknewskin-by-masulum';
+  const withUtm = (u) => u + (u.indexOf('?') > -1 ? '&' : '?') + UTM;
+  const LINK_BPIP = (uid) => withUtm('https://bpip.org/Profile?id=' + uid);
+  const LINK_BRDB = (uid) => 'https://brdb.cc/profile/' + uid;
+  const LINK_SCORE = (uid) => withUtm('https://postflayer.onrender.com/') + '#uid=' + uid;
+  const LINK_BOARD = (id) => 'https://bitcointalk.org/index.php?board=' + id + '.0';
+
 
   // Builds the poster info card from clones of the original poster info
   function posterCard(td) {
@@ -5203,10 +5512,24 @@ function sigBanInfo(td) {
     if (xs) {
       xExtraStats(xs, true).forEach((s) => {
         if (s.k === 'Score') addStat(s.k, s.v, s.color);
-        else if (s.k === 'DT') dtBadge = h('span', { class: 'btx-dt', title: s.tip ? 'DT (' + s.tip + ')' : 'DT' }, s.v);
+        else if (s.k === 'DT') dtBadge = h('a', { class: 'btx-dt btx-lnk', href: LINK_BPIP(posterUid(td)), target: '_blank', rel: 'noopener', title: (s.tip ? 'DT (' + s.tip + ')' : 'DT') + ' \u2022 BPIP' }, s.v);
         else stats.push(s);
       });
     }
+
+    const flagOk = prefs.brdb && xs && xs.fl && /^[a-z]{2}(-[a-z]{2,3})?$/.test(xs.fl);
+    const boardId = flagOk ? (Object.keys(BRDB_BOARDS).find((k) => BRDB_BOARDS[k][0] === xs.fl) || '') : '';
+    const flagEl = flagOk
+      ? h(boardId ? 'a' : 'span', {
+        class: 'btx-flag' + (boardId ? ' btx-lnk' : ''), role: 'img', 'aria-label': xs.fl.toUpperCase(), title: xs.ft || xs.fl.toUpperCase(),
+        style: "background-image:url('https://flagcdn.com/" + xs.fl + ".svg')",
+        href: boardId ? LINK_BOARD(boardId) : null, target: boardId ? '_blank' : null, rel: boardId ? 'noopener' : null
+      })
+      : null;
+    const brLine = (prefs.brdb && xs && xs.bs)
+      ? h('a', { class: 'btx-pi-score btx-pi-brdb btx-lnk', href: LINK_BRDB(posterUid(td)), target: '_blank', rel: 'noopener', title: 'BRDb Score', 'data-full': 'BRDb Score' },
+        h('em', {}, 'BRDb: '), h('b', {}, xs.bs + ' score'))
+      : null;
 
     const sc = stats.find((s) => /^score$/i.test(s.k)) || null;
     const shown = stats.filter((s) => s !== sc);
@@ -5220,7 +5543,7 @@ function sigBanInfo(td) {
     const deskOrder = narrowList.concat(wideList);
     const lastNarrow = narrowList.length % 2 ? narrowList[narrowList.length - 1] : null;
     const scoreLine = sc
-      ? h('div', { class: 'btx-pi-score', title: 'Nutildah Postflayer Score', 'data-full': 'Nutildah Postflayer Score', onclick: toggleStatTip },
+      ? h('a', { class: 'btx-pi-score btx-lnk', href: LINK_SCORE(posterUid(td)), target: '_blank', rel: 'noopener', title: 'Nutildah Postflayer Score', 'data-full': 'Nutildah Postflayer Score' },
         h('em', {}, 'Score: '), statVal(sc))
       : null;
 
@@ -5229,17 +5552,25 @@ function sigBanInfo(td) {
       h('div', { class: 'btx-pi-id' },
         h('div', { class: 'btx-pi-name' }, nameEl.cloneNode(true), op && h('span', { class: 'btx-op' }, 'OP'), dtBadge,
           status.length > 0 && h('span', { class: 'btx-st' }, status), sbBadge),
-        rank && h('div', { class: 'btx-pi-rank' }, rank),
-        stars.length > 0 && h('div', { class: 'btx-pi-stars' }, stars),
-        scoreLine,
+        (rank || stars.length > 0 || flagEl) && h('div', { class: 'btx-pi-rr' + (flagEl ? ' hasflag' : '') },
+          flagEl,
+          h('div', { class: 'btx-pi-rc' },
+            rank && h('div', { class: 'btx-pi-rank' }, rank),
+            stars.length > 0 && h('div', { class: 'btx-pi-stars' }, stars))),
+        (scoreLine || brLine) && h('div', { class: 'btx-pi-scores' }, scoreLine, brLine),
         (shown.length > 0 || sbBadge) && h('div', { class: 'btx-pi-stats' + (shown.length > 5 ? ' many' : ''), style: 'grid-template-rows:repeat(' + rows + ',auto)' },
           shown.map((s) => {
             const full = s.full || (s.tip ? s.k + ' (' + s.tip + ')' : s.k);
-            return h('span', {
-              class: 'btx-pi-stat' + (prefs.pabbr ? ' ab' : '') + (WIDE_K.includes(kOf(s)) || s === lastNarrow ? ' wide' : ''),
+            const isRank = /^rank$/i.test(s.k);
+            return h(isRank ? 'a' : 'span', {
+              class: 'btx-pi-stat' + (isRank ? ' btx-lnk' : '') + (prefs.pabbr ? ' ab' : '') + (WIDE_K.includes(kOf(s)) || s === lastNarrow ? ' wide' : ''),
               style: '--o:' + deskOrder.indexOf(s),
-              title: full, 'data-full': full, onclick: prefs.pabbr ? toggleStatTip : null
-            }, h('em', {}, h('span', { class: 'full' }, s.k), prefs.pabbr && h('span', { class: 'abv' }, statAbbr(s.k))), statVal(s));
+              title: full, 'data-full': full,
+              href: isRank ? LINK_BPIP(posterUid(td)) : null,
+              target: isRank ? '_blank' : null,
+              rel: isRank ? 'noopener' : null,
+              onclick: (prefs.pabbr && !isRank) ? toggleStatTip : null
+              }, h('em', {}, h('span', { class: 'full' }, s.k + ':'), prefs.pabbr && h('span', { class: 'abv' }, statAbbr(s.k) + ':')), statVal(s));
           }), sbBadge)
       ),
       extra.length > 0 && h('div', { class: 'btx-pi-extra' + (extra.length > 2 ? ' many' : '') }, extra),
@@ -5265,6 +5596,7 @@ function sigBanInfo(td) {
           if (old) old.replaceWith(card); else td.prepend(card);
           td.classList.add('btx-rebuilt');
             fitScores(card);
+            fitFlags(card);
         }
       } catch (e) { td.classList.remove('btx-rebuilt'); }
       if (mo) mo.takeRecords();
@@ -5283,12 +5615,19 @@ function sigBanInfo(td) {
     });
     mo.observe(td, { childList: true, subtree: true, characterData: true });
 
-    if (posterUid(td)) {
-      xLoad(posterUid(td), () => {
+    const uid = posterUid(td);
+    if (uid) {
+      const go = () => xLoad(uid, () => {
         if (queued) return;
         queued = true;
         requestAnimationFrame(draw);
       });
+      if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver((es) => {
+          if (es.some((e) => e.isIntersecting)) { io.disconnect(); go(); }
+        }, { rootMargin: '600px 0px' });
+        io.observe(td);
+      } else go();
     }
   }
 
